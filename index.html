@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MicroWave, BLR &amp; VSAT Lab</title>
+  <meta name="description" content="Simulateur pédagogique de réseaux Faisceaux Hertziens, Boucle Locale Radio et VSAT — Bac Pro Télécommunications." />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body data-mode="design">
+
+  <!-- =================================================================
+       PLANCHE D'ICÔNES SVG (utilisée par la boîte à outils et le canevas)
+       ================================================================= -->
+  <svg xmlns="http://www.w3.org/2000/svg" class="sprite" aria-hidden="true">
+    <defs>
+      <!-- Sites & obstacles -->
+      <symbol id="ico-tower" viewBox="0 0 60 200" preserveAspectRatio="xMidYMid meet"><g fill="none" stroke="currentColor" stroke-width="1.0" stroke-linecap="round" stroke-linejoin="round"><path d="M5 198 H55" vector-effect="non-scaling-stroke" /> <path d="M12 198 L24 10 H36 L48 198" vector-effect="non-scaling-stroke" /> <path d="M30 0 V10" vector-effect="non-scaling-stroke" /> <path d="M14 166 H46 M16 134 H44 M18 102 H42 M20 70 H40 M22 38 H38" vector-effect="non-scaling-stroke" /> <path d="M12 198 L46 166 M48 198 L14 166" vector-effect="non-scaling-stroke" /> <path d="M14 166 L44 134 M46 166 L16 134" vector-effect="non-scaling-stroke" /> <path d="M16 134 L42 102 M44 134 L18 102" vector-effect="non-scaling-stroke" /> <path d="M18 102 L40 70 M42 102 L20 70" vector-effect="non-scaling-stroke" /> <path d="M20 70 L38 38 M40 70 L22 38" vector-effect="non-scaling-stroke" /> <path d="M22 38 L36 10 M38 38 L24 10" vector-effect="non-scaling-stroke" /></g></symbol>
+      <symbol id="ico-building" viewBox="0 0 90 130" preserveAspectRatio="xMidYMid meet"><g fill="none" stroke="#2b3a4a" stroke-width="1.0" stroke-linejoin="round"><rect x="12" y="18" width="50" height="110" fill="#7d9ab2" vector-effect="non-scaling-stroke" /> <rect x="62" y="36" width="20" height="92" fill="#597287" vector-effect="non-scaling-stroke" /> <rect x="9" y="12" width="56" height="6" fill="#9fb9ce" vector-effect="non-scaling-stroke" /> <rect x="60" y="31" width="24" height="5" fill="#7d9ab2" vector-effect="non-scaling-stroke" /> <rect x="18" y="4" width="12" height="8" fill="#6b8399" vector-effect="non-scaling-stroke" /> <line x1="72" y1="31" x2="72" y2="16" vector-effect="non-scaling-stroke" /> <line x1="67" y1="20" x2="77" y2="20" vector-effect="non-scaling-stroke" /> <g fill="#4a6073"> <rect x="18" y="26" width="8" height="12" vector-effect="non-scaling-stroke" /> <rect x="33" y="26" width="8" height="12" vector-effect="non-scaling-stroke" /> <rect x="48" y="26" width="8" height="12" vector-effect="non-scaling-stroke" /> <rect x="18" y="46" width="8" height="12" vector-effect="non-scaling-stroke" /> <rect x="33" y="46" width="8" height="12" vector-effect="non-scaling-stroke" /> <rect x="48" y="46" width="8" height="12" vector-effect="non-scaling-stroke" /> <rect x="18" y="66" width="8" height="12" vector-effect="non-scaling-stroke" /> <rect x="33" y="66" width="8" height="12" vector-effect="non-scaling-stroke" /> <rect x="48" y="66" width="8" height="12" vector-effect="non-scaling-stroke" /> <rect x="18" y="86" width="8" height="12" vector-effect="non-scaling-stroke" /> <rect x="33" y="86" width="8" height="12" vector-effect="non-scaling-stroke" /> <rect x="48" y="86" width="8" height="12" vector-effect="non-scaling-stroke" /> <rect x="68" y="46" width="8" height="12" vector-effect="non-scaling-stroke" /> <rect x="68" y="66" width="8" height="12" vector-effect="non-scaling-stroke" /> <rect x="68" y="86" width="8" height="12" vector-effect="non-scaling-stroke" /> </g> <rect x="30" y="108" width="14" height="20" fill="#4a6073" vector-effect="non-scaling-stroke" /> <line x1="4" y1="128" x2="86" y2="128" stroke-linecap="round" vector-effect="non-scaling-stroke" /></g></symbol>
+      <symbol id="ico-obstacle" viewBox="0 0 120 80" preserveAspectRatio="xMidYMid meet"><g fill="none" stroke="#2c3e2e" stroke-width="1.0" stroke-linejoin="round"><polygon points="4,78 48,8 84,38 116,78" fill="#4b7b48" vector-effect="non-scaling-stroke" /> <polygon points="48,8 66,34 52,50 84,38" fill="#355e34" stroke="none" /> <polygon points="22,78 64,36 92,52 116,78" fill="#7c6d43" vector-effect="non-scaling-stroke" /> <polygon points="42,78 76,56 116,78" fill="#639647" vector-effect="non-scaling-stroke" /> <line x1="2" y1="78" x2="118" y2="78" stroke-linecap="round" vector-effect="non-scaling-stroke" /></g></symbol>
+      <symbol id="ico-forest" viewBox="0 0 80 100" preserveAspectRatio="xMidYMid meet"><g fill="none" stroke="#2d3b22" stroke-width="1.0" stroke-linecap="round" stroke-linejoin="round"><path d="M35 98 L37 64 L28 52 M45 98 L43 64 L52 52 M40 66 V48" fill="#6e5338" vector-effect="non-scaling-stroke" /> <path d="M22 66 C10 66, 6 52, 14 44 C10 34, 18 22, 28 22 C32 10, 48 10, 52 22 C62 22, 70 34, 66 44 C74 52, 70 66, 58 66 Z" fill="#5b913b" vector-effect="non-scaling-stroke" /> <path d="M26 36 C26 26, 36 20, 44 24 C52 20, 60 28, 56 38" fill="#7ab34d" stroke="none" /> <line x1="20" y1="98" x2="60" y2="98" vector-effect="non-scaling-stroke" /></g></symbol>
+      <!-- Faisceaux hertziens -->
+      <symbol id="ico-idu" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><rect x="2.5" y="8" width="19" height="8" rx="1.2"/><path d="M5.5 12h1M8 12h1M10.5 12h1"/><rect x="14" y="10.5" width="5" height="3" rx=".5"/></g></symbol>
+      <symbol id="ico-odu" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><rect x="6" y="5" width="12" height="14" rx="2.5"/><path d="M9 9h6M9 12h6M9 15h6M12 19v3"/></g></symbol>
+      <symbol id="ico-fullOutdoor" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"><path d="M4 4c4 2.5 4 13.5 0 16"/><path d="M4 4c3.5 0 5 2 5 8s-1.5 8-5 8"/><rect x="10.5" y="7" width="6" height="10" rx="1.5"/><path d="M16.5 12H21M19 10v4"/></g></symbol>
+      <symbol id="ico-antenna" viewBox="0 0 64 64" preserveAspectRatio="xMidYMid meet"><g fill="none" stroke="currentColor" stroke-width="1.0" stroke-linecap="round" stroke-linejoin="round"><path d="M0 26 V38" stroke-width="1.5" vector-effect="non-scaling-stroke" /> <path d="M0 32 H16" vector-effect="non-scaling-stroke" /> <rect x="16" y="16" width="12" height="32" rx="2" fill="currentColor" fill-opacity="0.25" vector-effect="non-scaling-stroke" /> <path d="M28 14 C34 14, 34 50, 28 50 Z" fill="currentColor" vector-effect="non-scaling-stroke" /> <line x1="34" y1="32" x2="62" y2="32" stroke-dasharray="3 3" stroke-opacity="0.7" vector-effect="non-scaling-stroke" /></g></symbol>
+      <!-- BLR -->
+      <symbol id="ico-blrBts" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"><path d="M12 22V9M8 22h8"/><rect x="10" y="3" width="4" height="7" rx="1"/><path d="M5 4.5a8 8 0 0 0 0 7M19 4.5a8 8 0 0 1 0 7M7.5 6a4.5 4.5 0 0 0 0 4M16.5 6a4.5 4.5 0 0 1 0 4"/></g></symbol>
+      <symbol id="ico-blrCpe" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"><rect x="6" y="3" width="10" height="12" rx="1.5"/><path d="M11 15v4M7 21h8M18.5 6a5 5 0 0 1 0 6M20.8 4a8 8 0 0 1 0 10"/></g></symbol>
+      <!-- VSAT -->
+      <symbol id="ico-satellite" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"><rect x="9" y="9" width="6" height="6" rx="1" transform="rotate(45 12 12)"/><path d="m8.2 8.2-3-3M15.8 15.8l3 3"/><rect x="1.5" y="1.5" width="5" height="3.2" rx=".5" transform="rotate(45 4 3.1)"/><rect x="17.5" y="19.3" width="5" height="3.2" rx=".5" transform="rotate(45 20 20.9)"/><path d="M14.5 6.5a3 3 0 0 1 3 3"/></g></symbol>
+      <symbol id="ico-hub" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"><path d="M3 9a9 9 0 0 0 12 8.5"/><path d="M3 9c3.5-1.5 9.5 2 12 8.5"/><path d="m9 13 6-8M15 5l1.5-1.5"/><path d="M9 14v4M5 22h10l-2-4H7z"/></g></symbol>
+      <symbol id="ico-vsatAntenna" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"><path d="M4 7.5a8 8 0 0 0 10.5 9"/><path d="M4 7.5c3-1.3 8.3 2 10.5 9"/><path d="m9 12.5 6.5-5M15.5 7.5l1.2.6M10 15v5M7 21h6"/></g></symbol>
+      <symbol id="ico-buc" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"><rect x="4" y="6" width="12" height="12" rx="1.5"/><path d="M16 12h5M18.5 9.5 21 12l-2.5 2.5M8 13.5l2-3 2 3"/></g></symbol>
+      <symbol id="ico-lnb" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"><path d="M3 9h5l3-2v10l-3-2H3z"/><rect x="11" y="8" width="9" height="8" rx="1.5"/><path d="M14 13.5l1.5-3 1.5 3"/></g></symbol>
+      <symbol id="ico-vsatModem" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"><rect x="2.5" y="9" width="19" height="8" rx="1.5"/><path d="M6 13h.01M9 13h.01M12 13h.01M15.5 13h3M8 9 6 4.5M16 9l2-4.5"/></g></symbol>
+      <!-- Réseau IP -->
+      <symbol id="ico-router" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"><ellipse cx="12" cy="12" rx="9.5" ry="6.5"/><path d="M7 10.5h4M9.5 8.5l2 2-2 2M17 13.5h-4M14.5 11.5l-2 2 2 2"/></g></symbol>
+      <symbol id="ico-switch" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"><rect x="2" y="7" width="20" height="10" rx="1.5"/><path d="M6 10.5h9M13 9l2 1.5-2 1.5M18 13.5H9M11 12l-2 1.5 2 1.5"/></g></symbol>
+      <symbol id="ico-gnodeb" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"><path d="M12 9v13M9 22h6M8 6l4 3 4-3"/><circle cx="12" cy="5" r="1.4"/><path d="M5.5 2.5a8 8 0 0 0 0 7M18.5 2.5a8 8 0 0 1 0 7"/></g></symbol>
+      <symbol id="ico-ruralSite" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"><path d="M3 21h18M5 21v-8l5-4 5 4v8M9 21v-4h2v4"/><path d="m15 11 2.5-6.5L20 11M16 8.5h3M17.5 4.5V2"/></g></symbol>
+      <symbol id="ico-bankAgency" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"><path d="M3 9h18L12 3zM5 9v9M9.5 9v9M14.5 9v9M19 9v9M3 21h18M3 18h18"/></g></symbol>
+      <symbol id="ico-pc" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"><rect x="3" y="4" width="18" height="12" rx="1.5"/><path d="M8 21h8M12 16v5"/></g></symbol>
+      <symbol id="ico-server" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"><rect x="5" y="3" width="14" height="6" rx="1"/><rect x="5" y="9" width="14" height="6" rx="1"/><rect x="5" y="15" width="14" height="6" rx="1"/><path d="M8 6h.01M8 12h.01M8 18h.01M12 6h4M12 12h4M12 18h4"/></g></symbol>
+      <symbol id="ico-internet" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"><path d="M7 18h10.5a4 4 0 0 0 .6-7.95A6 6 0 0 0 6.5 9 4.5 4.5 0 0 0 7 18z"/></g></symbol>
+      <!-- Outils -->
+      <symbol id="ico-select" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" d="m5 3 14 8-6 1.5L10 19z"/></symbol>
+      <symbol id="ico-link" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="5" cy="18" r="2.5"/><circle cx="19" cy="6" r="2.5"/><path d="M7 16 17 8"/></g></symbol>
+      <symbol id="ico-cut" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="m7.8 16.2 10-12M16.2 16.2l-10-12"/></g></symbol>
+      <symbol id="ico-delete" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 14h10l1-14M10 11v6M14 11v6"/></g></symbol>
+      <symbol id="ico-ping" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2-5 4 10 2-5h6"/></g></symbol>
+      <symbol id="ico-flow" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h14M14 5l3 3-3 3M21 16H7M10 13l-3 3 3 3"/></g></symbol>
+      <symbol id="ico-zoomin" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m20 20-4.8-4.8M8 10.5h5M10.5 8v5"/></g></symbol>
+      <symbol id="ico-zoomout" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m20 20-4.8-4.8M8 10.5h5"/></g></symbol>
+      <symbol id="ico-fit" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></g></symbol>
+      <symbol id="ico-rain" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 14h10a4 4 0 0 0 .5-7.97A5.5 5.5 0 0 0 7 6.5 3.75 3.75 0 0 0 7 14z"/><path d="m8 17-1 3M12 17l-1 3M16 17l-1 3"/></g></symbol>
+      <symbol id="ico-book" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M4 4.5A1.5 1.5 0 0 1 5.5 3H20v15H5.5A1.5 1.5 0 0 0 4 19.5z"/><path d="M4 19.5A1.5 1.5 0 0 0 5.5 21H20v-3"/></g></symbol>
+      <symbol id="ico-lab" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"><path d="M9 3h6M10 3v6l-5.5 9.5A1.7 1.7 0 0 0 6 21h12a1.7 1.7 0 0 0 1.5-2.5L14 9V3"/><path d="M7.5 15h9"/></g></symbol>
+      <symbol id="ico-new" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"><path d="M14 3H6v18h12V7z"/><path d="M14 3v4h4M12 11v6M9 14h6"/></g></symbol>
+      <symbol id="ico-open" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M3 6.5V19h16l2-8H7l-2 8M3 6.5V5h6l2 2h7v4"/></g></symbol>
+      <symbol id="ico-save" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M4 4h13l3 3v13H4z"/><path d="M8 4v5h7V4M7 20v-6h10v6"/></g></symbol>
+      <symbol id="ico-image" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"><rect x="3" y="4" width="18" height="16" rx="1.5"/><circle cx="9" cy="9.5" r="1.8"/><path d="m21 16-5-5-9 9"/></g></symbol>
+      <symbol id="ico-close" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M6 6l12 12M18 6 6 18"/></symbol>
+      <symbol id="ico-play" viewBox="0 0 24 24"><path fill="currentColor" d="M8 5v14l11-7z"/></symbol>
+      <symbol id="ico-pause" viewBox="0 0 24 24"><path fill="currentColor" d="M7 5h4v14H7zM13 5h4v14h-4z"/></symbol>
+      <symbol id="ico-logo" viewBox="0 0 32 32"><g fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M6 28 10 10l4 18M7.3 22h5.4" stroke="#22d3ee" stroke-width="2"/><path d="M4 8a8.5 8.5 0 0 1 12 0M6.8 10.6a4.6 4.6 0 0 1 6.4 0" stroke="#22d3ee" stroke-width="2"/><path d="M19 13a9 9 0 0 0 9 9M19 13c4-1 8 4 9 9M22 19l4-5" stroke="#a78bfa" stroke-width="2"/><circle cx="26" cy="6" r="2.5" stroke="#f59e0b" stroke-width="2"/></g></symbol>
+      <!-- Dessins étirables (profil de Fresnel) — d'après pylone.svg, immeuble.svg, relief.svg, arbre.svg, antenne_directionnelle.svg -->
+      <symbol id="art-pylone" viewBox="0 0 60 200" preserveAspectRatio="none"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 198 H55" vector-effect="non-scaling-stroke" /> <path d="M12 198 L24 10 H36 L48 198" vector-effect="non-scaling-stroke" /> <path d="M30 0 V10" vector-effect="non-scaling-stroke" /> <path d="M14 166 H46 M16 134 H44 M18 102 H42 M20 70 H40 M22 38 H38" vector-effect="non-scaling-stroke" /> <path d="M12 198 L46 166 M48 198 L14 166" vector-effect="non-scaling-stroke" /> <path d="M14 166 L44 134 M46 166 L16 134" vector-effect="non-scaling-stroke" /> <path d="M16 134 L42 102 M44 134 L18 102" vector-effect="non-scaling-stroke" /> <path d="M18 102 L40 70 M42 102 L20 70" vector-effect="non-scaling-stroke" /> <path d="M20 70 L38 38 M40 70 L22 38" vector-effect="non-scaling-stroke" /> <path d="M22 38 L36 10 M38 38 L24 10" vector-effect="non-scaling-stroke" /></g></symbol>
+      <symbol id="art-immeuble" viewBox="0 0 90 130" preserveAspectRatio="none"><g fill="none" stroke="#2b3a4a" stroke-width="2" stroke-linejoin="round"><rect x="12" y="18" width="50" height="110" fill="#7d9ab2" vector-effect="non-scaling-stroke" /> <rect x="62" y="36" width="20" height="92" fill="#597287" vector-effect="non-scaling-stroke" /> <rect x="9" y="12" width="56" height="6" fill="#9fb9ce" vector-effect="non-scaling-stroke" /> <rect x="60" y="31" width="24" height="5" fill="#7d9ab2" vector-effect="non-scaling-stroke" /> <rect x="18" y="4" width="12" height="8" fill="#6b8399" vector-effect="non-scaling-stroke" /> <line x1="72" y1="31" x2="72" y2="16" vector-effect="non-scaling-stroke" /> <line x1="67" y1="20" x2="77" y2="20" vector-effect="non-scaling-stroke" /> <g fill="#4a6073"> <rect x="18" y="26" width="8" height="12" vector-effect="non-scaling-stroke" /> <rect x="33" y="26" width="8" height="12" vector-effect="non-scaling-stroke" /> <rect x="48" y="26" width="8" height="12" vector-effect="non-scaling-stroke" /> <rect x="18" y="46" width="8" height="12" vector-effect="non-scaling-stroke" /> <rect x="33" y="46" width="8" height="12" vector-effect="non-scaling-stroke" /> <rect x="48" y="46" width="8" height="12" vector-effect="non-scaling-stroke" /> <rect x="18" y="66" width="8" height="12" vector-effect="non-scaling-stroke" /> <rect x="33" y="66" width="8" height="12" vector-effect="non-scaling-stroke" /> <rect x="48" y="66" width="8" height="12" vector-effect="non-scaling-stroke" /> <rect x="18" y="86" width="8" height="12" vector-effect="non-scaling-stroke" /> <rect x="33" y="86" width="8" height="12" vector-effect="non-scaling-stroke" /> <rect x="48" y="86" width="8" height="12" vector-effect="non-scaling-stroke" /> <rect x="68" y="46" width="8" height="12" vector-effect="non-scaling-stroke" /> <rect x="68" y="66" width="8" height="12" vector-effect="non-scaling-stroke" /> <rect x="68" y="86" width="8" height="12" vector-effect="non-scaling-stroke" /> </g> <rect x="30" y="108" width="14" height="20" fill="#4a6073" vector-effect="non-scaling-stroke" /> <line x1="4" y1="128" x2="86" y2="128" stroke-linecap="round" vector-effect="non-scaling-stroke" /></g></symbol>
+      <symbol id="art-relief" viewBox="0 0 120 80" preserveAspectRatio="none"><g fill="none" stroke="#2c3e2e" stroke-width="2" stroke-linejoin="round"><polygon points="4,78 48,8 84,38 116,78" fill="#4b7b48" vector-effect="non-scaling-stroke" /> <polygon points="48,8 66,34 52,50 84,38" fill="#355e34" stroke="none" /> <polygon points="22,78 64,36 92,52 116,78" fill="#7c6d43" vector-effect="non-scaling-stroke" /> <polygon points="42,78 76,56 116,78" fill="#639647" vector-effect="non-scaling-stroke" /> <line x1="2" y1="78" x2="118" y2="78" stroke-linecap="round" vector-effect="non-scaling-stroke" /></g></symbol>
+      <symbol id="art-antenne" viewBox="0 0 64 64" preserveAspectRatio="none"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M0 26 V38" stroke-width="3" vector-effect="non-scaling-stroke" /> <path d="M0 32 H16" vector-effect="non-scaling-stroke" /> <rect x="16" y="16" width="12" height="32" rx="2" fill="currentColor" fill-opacity="0.25" vector-effect="non-scaling-stroke" /> <path d="M28 14 C34 14, 34 50, 28 50 Z" fill="currentColor" vector-effect="non-scaling-stroke" /> <line x1="34" y1="32" x2="62" y2="32" stroke-dasharray="3 3" stroke-opacity="0.7" vector-effect="non-scaling-stroke" /></g></symbol>
+      <symbol id="art-arbre" viewBox="0 0 80 100" preserveAspectRatio="none"><g fill="none" stroke="#2d3b22" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M35 98 L37 64 L28 52 M45 98 L43 64 L52 52 M40 66 V48" fill="#6e5338" vector-effect="non-scaling-stroke" /> <path d="M22 66 C10 66, 6 52, 14 44 C10 34, 18 22, 28 22 C32 10, 48 10, 52 22 C62 22, 70 34, 66 44 C74 52, 70 66, 58 66 Z" fill="#5b913b" vector-effect="non-scaling-stroke" /> <path d="M26 36 C26 26, 36 20, 44 24 C52 20, 60 28, 56 38" fill="#7ab34d" stroke="none" /> <line x1="20" y1="98" x2="60" y2="98" vector-effect="non-scaling-stroke" /></g></symbol>
+    </defs>
+  </svg>
+
+  <!-- =================================================================
+       1. BARRE SUPÉRIEURE
+       ================================================================= -->
+  <header class="topbar">
+    <div class="brand">
+      <svg class="brand-logo"><use href="#ico-logo"/></svg>
+      <div class="brand-text">
+        <h1>MicroWave, BLR &amp; VSAT Lab</h1>
+        <span class="brand-sub">Simulateur de réseaux hertziens &amp; satellitaires — Bac Pro Télécoms</span>
+      </div>
+    </div>
+
+    <div class="topbar-group file-group" role="group" aria-label="Fichier">
+      <button class="btn" id="btn-new" title="Nouvelle topologie (vide)"><svg class="i"><use href="#ico-new"/></svg><span>Nouveau</span></button>
+      <button class="btn" id="btn-open" title="Ouvrir une topologie JSON"><svg class="i"><use href="#ico-open"/></svg><span>Ouvrir</span></button>
+      <button class="btn" id="btn-save" title="Sauvegarder la topologie au format JSON"><svg class="i"><use href="#ico-save"/></svg><span>Sauvegarder</span></button>
+      <button class="btn btn-icon" id="btn-export-svg" title="Exporter le schéma en image (SVG) pour le compte rendu"><svg class="i"><use href="#ico-image"/></svg></button>
+      <input type="file" id="file-input" accept=".json,application/json" hidden />
+    </div>
+
+    <div class="topbar-group mode-switch" role="radiogroup" aria-label="Mode de travail">
+      <button class="mode-btn active" data-mode="design" role="radio" aria-checked="true" title="Placer, relier et configurer les équipements">Conception RF/IP</button>
+      <button class="mode-btn" data-mode="weather" role="radio" aria-checked="false" title="Étudier la pluie et la propagation">Météo &amp; Propagation</button>
+      <button class="mode-btn" data-mode="diag" role="radio" aria-checked="false" title="Couper des liens, dépointer, tester la résilience">Diagnostic / Pannes</button>
+    </div>
+
+    <div class="topbar-group rain-control" title="Intensité de pluie appliquée aux liaisons (0 à 100 mm/h)">
+      <svg class="i rain-icon"><use href="#ico-rain"/></svg>
+      <label for="rain-slider" class="rain-label">Pluie</label>
+      <input type="range" id="rain-slider" min="0" max="100" step="1" value="0" />
+      <output id="rain-value" for="rain-slider">0 mm/h</output>
+      <span id="rain-desc" class="rain-desc">Ciel clair</span>
+    </div>
+
+    <div class="topbar-group">
+      <button class="btn btn-accent" id="btn-labs"><svg class="i"><use href="#ico-lab"/></svg><span>Travaux Pratiques (TP)</span></button>
+      <button class="btn" id="btn-docs"><svg class="i"><use href="#ico-book"/></svg><span>Documentation</span></button>
+    </div>
+  </header>
+
+  <main class="layout">
+
+    <!-- ===============================================================
+         2. PANNEAU GAUCHE — BOÎTE À OUTILS
+         =============================================================== -->
+    <aside class="panel toolbox" id="toolbox" aria-label="Boîte à outils">
+      <div class="panel-head">
+        <h2>Boîte à outils</h2>
+        <input type="search" id="palette-search" class="search" placeholder="Rechercher…" aria-label="Rechercher un équipement" />
+      </div>
+      <div class="panel-body palette" id="palette">
+
+        <details class="pal-group" open>
+          <summary><span class="dot dot-site"></span>Sites &amp; Obstacles</summary>
+          <div class="pal-items">
+            <div class="pal-item" draggable="true" data-type="tower"><svg><use href="#ico-tower"/></svg><span>Pylône / Tour<small>15 à 150 m</small></span></div>
+            <div class="pal-item" draggable="true" data-type="building"><svg><use href="#ico-building"/></svg><span>Toit-terrasse<small>Immeuble R+N</small></span></div>
+            <div class="pal-item" draggable="true" data-type="obstacle:hill"><svg><use href="#ico-obstacle"/></svg><span>Relief / Colline<small>Obstacle naturel · Fresnel</small></span></div>
+            <div class="pal-item" draggable="true" data-type="obstacle:forest"><svg><use href="#ico-forest"/></svg><span>Arbres / Forêt<small>Végétation sur le trajet</small></span></div>
+            <div class="pal-item" draggable="true" data-type="obstacle:building"><svg><use href="#ico-building"/></svg><span>Bâtiment haut<small>Obstacle urbain</small></span></div>
+          </div>
+        </details>
+
+        <details class="pal-group" open>
+          <summary><span class="dot dot-fh"></span>Faisceaux Hertziens (FH)</summary>
+          <div class="pal-items">
+            <div class="pal-item" draggable="true" data-type="idu"><svg><use href="#ico-idu"/></svg><span>IDU<small>Indoor Unit hybride/IP</small></span></div>
+            <div class="pal-item" draggable="true" data-type="odu"><svg><use href="#ico-odu"/></svg><span>ODU<small>Émetteur-récepteur RF</small></span></div>
+            <div class="pal-item" draggable="true" data-type="fullOutdoor"><svg><use href="#ico-fullOutdoor"/></svg><span>Full-Outdoor IP<small>Radio tout-en-un PoE++</small></span></div>
+            <div class="pal-item" draggable="true" data-type="antenna"><svg><use href="#ico-antenna"/></svg><span>Antenne parabolique<small>0,3 à 2,4 m · XPIC</small></span></div>
+          </div>
+        </details>
+
+        <details class="pal-group" open>
+          <summary><span class="dot dot-blr"></span>Boucle Locale Radio (BLR)</summary>
+          <div class="pal-items">
+            <div class="pal-item" draggable="true" data-type="blrBts"><svg><use href="#ico-blrBts"/></svg><span>Station de base BLR<small>Secteur 90°/120°</small></span></div>
+            <div class="pal-item" draggable="true" data-type="blrCpe"><svg><use href="#ico-blrCpe"/></svg><span>Terminal abonné CPE<small>Outdoor / Indoor</small></span></div>
+          </div>
+        </details>
+
+        <details class="pal-group" open>
+          <summary><span class="dot dot-vsat"></span>Liaisons satellitaires (VSAT)</summary>
+          <div class="pal-items">
+            <div class="pal-item" draggable="true" data-type="satellite"><svg><use href="#ico-satellite"/></svg><span>Satellite relais<small>GEO / MEO / LEO</small></span></div>
+            <div class="pal-item" draggable="true" data-type="hub"><svg><use href="#ico-hub"/></svg><span>Hub / Téléport<small>Antenne 4,5 à 9 m · HPA</small></span></div>
+            <div class="pal-item" draggable="true" data-type="vsatAntenna"><svg><use href="#ico-vsatAntenna"/></svg><span>Antenne VSAT<small>0,75 à 2,4 m</small></span></div>
+            <div class="pal-item" draggable="true" data-type="buc"><svg><use href="#ico-buc"/></svg><span>BUC<small>Ampli. montant 2 à 16 W</small></span></div>
+            <div class="pal-item" draggable="true" data-type="lnb"><svg><use href="#ico-lnb"/></svg><span>LNB<small>Récepteur faible bruit</small></span></div>
+            <div class="pal-item" draggable="true" data-type="vsatModem"><svg><use href="#ico-vsatModem"/></svg><span>Modem satellite IP<small>DVB-S2X · ACM</small></span></div>
+          </div>
+        </details>
+
+        <details class="pal-group" open>
+          <summary><span class="dot dot-ip"></span>Réseau IP / MPLS</summary>
+          <div class="pal-items">
+            <div class="pal-item" draggable="true" data-type="router"><svg><use href="#ico-router"/></svg><span>Routeur IP/MPLS<small>PE / P · OSPF · LSP</small></span></div>
+            <div class="pal-item" draggable="true" data-type="switch"><svg><use href="#ico-switch"/></svg><span>Switch Carrier Eth.<small>VLAN · QoS · ERPS</small></span></div>
+            <div class="pal-item" draggable="true" data-type="gnodeb"><svg><use href="#ico-gnodeb"/></svg><span>BTS / gNodeB<small>Station mobile</small></span></div>
+            <div class="pal-item" draggable="true" data-type="ruralSite"><svg><use href="#ico-ruralSite"/></svg><span>Site rural / minier<small>Terminal distant</small></span></div>
+            <div class="pal-item" draggable="true" data-type="bankAgency"><svg><use href="#ico-bankAgency"/></svg><span>Agence bancaire<small>PC · Téléphonie IP</small></span></div>
+            <div class="pal-item" draggable="true" data-type="pc"><svg><use href="#ico-pc"/></svg><span>PC / Téléphone IP<small>Poste utilisateur</small></span></div>
+            <div class="pal-item" draggable="true" data-type="server"><svg><use href="#ico-server"/></svg><span>Serveur<small>Siège / data center</small></span></div>
+            <div class="pal-item" draggable="true" data-type="internet"><svg><use href="#ico-internet"/></svg><span>Internet / Cœur<small>Nuage opérateur</small></span></div>
+          </div>
+        </details>
+
+        <div class="pal-help">
+          <p><b>Glisser</b> un équipement sur le canevas. <b>Outil Lier</b> (L) : cliquer deux équipements pour les relier — le type de lien (FH, BLR, VSAT, Ethernet…) est déduit automatiquement. <b>Hauteur d’un pylône</b> : tirez la poignée à son sommet (15 à 150 m).</p>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ===============================================================
+         3. ZONE CENTRALE — CANEVAS
+         =============================================================== -->
+    <section class="workspace" aria-label="Espace de travail">
+      <div class="canvas-toolbar" role="toolbar" aria-label="Outils du canevas">
+        <div class="tool-group">
+          <button class="tool active" data-tool="select" title="Sélection / déplacement (V)"><svg><use href="#ico-select"/></svg></button>
+          <button class="tool" data-tool="link" title="Relier deux équipements (L)"><svg><use href="#ico-link"/></svg></button>
+          <select id="link-medium" class="select-sm" title="Type de lien filaire à créer">
+            <option value="auto">Lien : auto</option>
+            <option value="ethernet">Câble Ethernet (RJ45)</option>
+            <option value="fiber">Fibre optique</option>
+          </select>
+          <button class="tool" data-tool="flow" title="Créer un flux de trafic entre deux terminaux (F)"><svg><use href="#ico-flow"/></svg></button>
+          <button class="tool" data-tool="ping" title="Ping / traceroute entre deux terminaux (P)"><svg><use href="#ico-ping"/></svg></button>
+          <button class="tool diag-only" data-tool="cut" title="Couper / rétablir un lien (C)"><svg><use href="#ico-cut"/></svg></button>
+          <button class="tool" data-tool="delete" title="Supprimer un élément (Suppr)"><svg><use href="#ico-delete"/></svg></button>
+        </div>
+        <div class="tool-group">
+          <button class="btn btn-xs weather-only" id="btn-storm" title="Faire passer un orage : la pluie monte de 0 à 100 mm/h puis redescend"><svg class="i"><use href="#ico-rain"/></svg><span>Simuler un orage</span></button>
+          
+          <span class="clock-ctl moving-only" title="Horloge de simulation : fait défiler les satellites LEO / MEO">
+            <button class="tool" id="btn-clock" title="Lancer / arrêter l’horloge de simulation (satellites défilants)"><svg><use href="#ico-play"/></svg></button>
+            <select id="clock-speed" class="select-sm" title="Vitesse de l’horloge"><option value="1">×1</option><option value="10">×10</option><option value="60" selected>×60</option><option value="300">×300</option></select>
+            <span id="clock-time" class="zoom-value">T+0:00</span>
+          </span>
+          <button class="tool" id="btn-anim" title="Animer les flux IP/VLAN"><svg><use href="#ico-pause"/></svg></button>
+          <label class="scale-ctl" title="Échelle du plan : distance représentée par un carreau de la grille">
+            <span class="scale-txt">Échelle</span>
+            <select id="scale-select" class="select-sm">
+              <option value="0.25">1 carreau = 0,25 km</option>
+              <option value="0.5">1 carreau = 0,5 km</option>
+              <option value="1">1 carreau = 1 km</option>
+              <option value="2" selected>1 carreau = 2 km</option>
+              <option value="5">1 carreau = 5 km</option>
+              <option value="10">1 carreau = 10 km</option>
+            </select>
+          </label>
+          <button class="tool" id="btn-zoom-out" title="Zoom arrière (−)"><svg><use href="#ico-zoomout"/></svg></button>
+          <span id="zoom-value" class="zoom-value">100 %</span>
+          <button class="tool" id="btn-zoom-in" title="Zoom avant (+)"><svg><use href="#ico-zoomin"/></svg></button>
+          <button class="tool" id="btn-zoom-fit" title="Tout afficher (0)"><svg><use href="#ico-fit"/></svg></button>
+        </div>
+      </div>
+
+      <div class="canvas-wrap" id="canvas-wrap">
+        <svg id="canvas" xmlns="http://www.w3.org/2000/svg" role="application" aria-label="Topologie du réseau">
+          <defs id="canvas-defs"></defs>
+          <g id="viewport">
+            <g id="layer-background"></g>
+            <g id="layer-grid"></g>
+            <g id="layer-links"></g>
+            <g id="layer-beams"></g>
+            <g id="layer-nodes"></g>
+            <g id="layer-packets"></g>
+            <g id="layer-overlay"></g>
+          </g>
+        </svg>
+        <div class="canvas-legend" id="canvas-legend">
+          <span><i class="lg lg-ok"></i>ACM optimal</span>
+          <span><i class="lg lg-deg"></i>Repli modulation / pluie</span>
+          <span><i class="lg lg-down"></i>Coupure / dépointage</span>
+          <span><i class="lg lg-wire"></i>Ethernet / Fibre</span>
+          <span><i class="lg lg-blocked"></i>RPL bloqué (ERPS)</span>
+        </div>
+        <div class="canvas-hint" id="canvas-hint">Glissez des équipements depuis la boîte à outils, ou chargez un TP.</div>
+        <div class="toast-zone" id="toast-zone" aria-live="polite"></div>
+      </div>
+
+      <!-- Console / Journal (bas du canevas) -->
+      <div class="console" id="console">
+        <div class="console-tabs" role="tablist">
+          <button class="ctab active" data-ctab="log" role="tab">Journal d’événements</button>
+          <button class="ctab" data-ctab="term" role="tab">Console (ping / traceroute)</button>
+          <button class="ctab" data-ctab="flows" role="tab">Flux de trafic</button>
+          <span class="console-spacer"></span>
+          <button class="btn btn-ghost btn-xs" id="btn-console-clear" title="Effacer">Effacer</button>
+          <button class="btn btn-ghost btn-xs" id="btn-console-toggle" title="Réduire / agrandir">▾</button>
+        </div>
+        <div class="console-body">
+          <div class="cpane active" id="cpane-log"><ul class="log-list" id="log-list"></ul></div>
+          <div class="cpane" id="cpane-term"><pre class="terminal" id="terminal">MicroWave, BLR &amp; VSAT Lab — Console
+Utilisez l’outil Ping (P) puis cliquez sur deux terminaux.
+</pre></div>
+          <div class="cpane" id="cpane-flows"><div id="flows-table"></div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===============================================================
+         4. PANNEAU DROIT — INSPECTEUR & ANALYSEURS
+         =============================================================== -->
+    <aside class="panel inspector" id="inspector" aria-label="Inspecteur">
+      <div class="panel-head">
+        <h2 id="insp-title">Inspecteur</h2>
+        <span id="insp-subtitle" class="insp-sub">Aucune sélection</span>
+      </div>
+      <div class="insp-tabs" role="tablist">
+        <button class="itab active" data-itab="props" role="tab">Paramètres</button>
+        <button class="itab" data-itab="budget" role="tab">Bilan de liaison</button>
+        <button class="itab" data-itab="profile" role="tab">Profil &amp; Fresnel</button>
+        <button class="itab" data-itab="network" role="tab">Réseau</button>
+      </div>
+      <div class="panel-body insp-body">
+        <div class="ipane active" id="ipane-props">
+          <div class="empty-state">
+            <svg><use href="#ico-select"/></svg>
+            <p>Sélectionnez un équipement ou un lien sur le canevas pour afficher et modifier ses paramètres.</p>
+          </div>
+        </div>
+        <div class="ipane" id="ipane-budget">
+          <div class="empty-state"><p>Sélectionnez une liaison radio (FH, BLR ou VSAT) pour afficher son bilan détaillé pas à pas.</p></div>
+        </div>
+        <div class="ipane" id="ipane-profile">
+          <div class="empty-state"><p>Sélectionnez une liaison FH ou BLR pour afficher le profil de terrain et la 1ère zone de Fresnel.</p></div>
+        </div>
+        <div class="ipane" id="ipane-network">
+          <div class="empty-state"><p>Vue d’ensemble : anneaux ERPS, LSP MPLS, VLAN et charge des liens.</p></div>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <!-- Barre d'état -->
+  <footer class="statusbar">
+    <span id="st-mode">Mode : Conception RF/IP</span>
+    <span id="st-counts">0 équipement · 0 lien</span>
+    <span id="st-health"></span>
+    <span class="st-spacer"></span>
+    <span id="st-coords">x = — km · y = — km</span>
+    <span id="st-file">Topologie sans titre</span>
+    <span id="st-edition" class="edition-badge"></span>
+    
+  </footer>
+
+  <!-- =================================================================
+       FENÊTRES MODALES
+       ================================================================= -->
+
+  <!-- Travaux Pratiques -->
+  <div class="modal" id="modal-labs" role="dialog" aria-modal="true" aria-labelledby="labs-title" hidden>
+    <div class="modal-box modal-wide">
+      <div class="modal-head">
+        <h2 id="labs-title">Activités pédagogiques</h2>
+        <button class="btn btn-icon btn-ghost modal-close" data-close="modal-labs" title="Fermer"><svg class="i"><use href="#ico-close"/></svg></button>
+      </div>
+      <div class="modal-split">
+        <nav class="modal-nav" id="labs-list" aria-label="Liste des activités"></nav>
+        <article class="modal-content" id="labs-detail"></article>
+      </div>
+    </div>
+  </div>
+
+  <!-- Documentation -->
+  <div class="modal" id="modal-docs" role="dialog" aria-modal="true" aria-labelledby="docs-title" hidden>
+    <div class="modal-box modal-wide">
+      <div class="modal-head">
+        <h2 id="docs-title">Cours FH, BLR, VSAT &amp; Microwave IP</h2>
+        <button class="btn btn-icon btn-ghost modal-close" data-close="modal-docs" title="Fermer"><svg class="i"><use href="#ico-close"/></svg></button>
+      </div>
+      <div class="modal-split">
+        <nav class="modal-nav" id="docs-toc" aria-label="Sommaire du cours"></nav>
+        <article class="modal-content doc" id="docs-content"></article>
+      </div>
+    </div>
+  </div>
+
+  <!-- Boîte de dialogue générique (flux, confirmation…) -->
+  <div class="modal" id="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="dialog-title" hidden>
+    <div class="modal-box modal-small">
+      <div class="modal-head">
+        <h2 id="dialog-title">Dialogue</h2>
+        <button class="btn btn-icon btn-ghost modal-close" data-close="modal-dialog" title="Fermer"><svg class="i"><use href="#ico-close"/></svg></button>
+      </div>
+      <div class="modal-content" id="dialog-body"></div>
+      <div class="modal-foot" id="dialog-foot"></div>
+    </div>
+  </div>
+
+  <!-- Panneau flottant de consignes du TP en cours -->
+  <div class="lab-coach" id="lab-coach" hidden>
+    <div class="coach-head">
+      <span class="coach-badge" id="coach-badge">TP</span>
+      <strong id="coach-title"></strong>
+      <button class="btn btn-icon btn-ghost btn-xs" id="coach-min" title="Réduire">▾</button>
+      <button class="btn btn-icon btn-ghost btn-xs" id="coach-close" title="Fermer le TP"><svg class="i"><use href="#ico-close"/></svg></button>
+    </div>
+    <div class="coach-body" id="coach-body"></div>
+    <div class="coach-foot">
+      <button class="btn btn-xs" id="coach-prev">◀ Étape précédente</button>
+      <span id="coach-progress"></span>
+      <button class="btn btn-xs btn-accent" id="coach-next">Étape suivante ▶</button>
+    </div>
+  </div>
+
+  <noscript><div class="noscript">JavaScript doit être activé pour utiliser le simulateur.</div></noscript>
+
+  <!-- Scripts (ordre important : moteurs → TP → interface) -->
+  <script src="edition.js"></script>
+  <script src="radio_physics.js"></script>
+  <script src="sat_physics.js"></script>
+  <script src="ip_network.js"></script>
+  <script src="pannes.js"></script>
+  <script src="tutorials.js"></script>
+  <script src="labs.js"></script>
+  <script src="exercises.js"></script>
+  <script src="exam.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

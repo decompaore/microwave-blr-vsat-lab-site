@@ -1,0 +1,8 @@
+MicroWave, BLR & VSAT Lab — VERSION ENSEIGNANT PROTÉGÉE
+Version : 2026-11-20-bc0dd94
+
+Ouvrir index.html puis saisir le mot de passe de l’établissement. Fonctionne aussi hors ligne.
+Le contenu (corrigés, examens, outils de l’enseignant) est chiffré (AES-256) : sans le mot
+de passe, il est illisible. Ce dossier peut être déposé sur un partage ou publié sur un site.
+Le code enseignant (« PROF » par défaut) reste demandé ensuite pour afficher les corrigés.
+Changer de mot de passe : reconstruire avec MBV_MDP='nouveau' node tools/paquets.js.

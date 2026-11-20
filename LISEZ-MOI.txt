@@ -1,0 +1,28 @@
+MicroWave, BLR & VSAT Lab — version élève
+Version : 2026-11-20-bc0dd94
+
+LANCER LE SIMULATEUR
+  Double-cliquez sur index.html (Chrome, Edge ou Firefox récent).
+  Aucune installation ni connexion Internet n’est nécessaire.
+
+PAR OÙ COMMENCER ?
+  1. Bouton « Travaux Pratiques (TP) » → onglet « Tutoriels » → T1 Premiers pas.
+  2. Puis les TP demandés par votre professeur (onglet « Travaux pratiques »).
+  3. Pour réviser : onglet « Exercices corrigés ».
+  4. Le cours complet : bouton « Documentation ».
+
+ENREGISTRER VOTRE TRAVAIL
+  Bouton « Sauvegarder » (ou Ctrl+S) : un fichier .json est téléchargé.
+  Bouton « Ouvrir » pour le reprendre plus tard, sur n’importe quel poste.
+  Le bouton image exporte votre schéma (SVG) pour le compte rendu.
+
+RACCOURCIS UTILES
+  V sélection · L lier · F flux · P ping · C panne (mode Diagnostic)
+  Suppr supprimer · Ctrl+Z annuler · Ctrl+Y rétablir · 0 tout afficher
+
+INSTALLATION SUR LES POSTES WINDOWS DU LYCÉE (administrateur)
+  Double-cliquez sur installer-eleve.cmd (les droits administrateur sont demandés).
+  L’application est copiée dans « C:\Program Files\MicroWave BLR VSAT Lab »,
+  en lecture seule pour les élèves, avec un raccourci sur le bureau de tous
+  les utilisateurs et dans le menu Démarrer. Relancer le script met à jour.
+  Désinstallation : installer-eleve.cmd -Desinstaller
