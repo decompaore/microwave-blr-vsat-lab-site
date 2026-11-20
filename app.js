@@ -599,8 +599,8 @@
     };
     const interf = interferenceOn() ? { atB: interferenceAt(link, B, na, freq.A.txGHz, chA), atA: interferenceAt(link, A, nb, freq.B.txGHz, chA) } : null;
     const iLvl = (at) => (at && at.list.length ? at.iDbm : undefined);
-    const ab = RP.computeLinkBudget(Object.assign({}, common, { txPowerDbm: txA, gTxDbi: gA, gRxDbi: gB, lossTxDb: num(A.rf.props.lossDb, 0.5), lossRxDb: num(B.rf.props.lossDb, 0.5), nfDb: bandB.nf, xpic: !!mB.xpic, interferenceDbm: iLvl(interf && interf.atB) }));
-    const ba = RP.computeLinkBudget(Object.assign({}, common, { txPowerDbm: txB, gTxDbi: gB, gRxDbi: gA, lossTxDb: num(B.rf.props.lossDb, 0.5), lossRxDb: num(A.rf.props.lossDb, 0.5), nfDb: bandA.nf, xpic: !!mA.xpic, interferenceDbm: iLvl(interf && interf.atA) }));
+    const ab = RP.computeLinkBudget(Object.assign({}, common, { txPowerDbm: txA, gTxDbi: gA, gRxDbi: gB, lossTxDb: num(A.rf.props.lossDb, 0.5), lossRxDb: num(B.rf.props.lossDb, 0.5), nfDb: bandB.nf, xpic: !!mB.xpic, interferenceDbm: iLvl(interf && interf.atB), hiddenLossDb: hiddenLoss - recetteDelta(link, A.node, B.node, 'ab') }));
+    const ba = RP.computeLinkBudget(Object.assign({}, common, { txPowerDbm: txB, gTxDbi: gB, gRxDbi: gA, lossTxDb: num(B.rf.props.lossDb, 0.5), lossRxDb: num(A.rf.props.lossDb, 0.5), nfDb: bandA.nf, xpic: !!mA.xpic, interferenceDbm: iLvl(interf && interf.atA), hiddenLossDb: hiddenLoss - recetteDelta(link, B.node, A.node, 'ba') }));
     const nameA = endName(na);
     const nameB = endName(nb);
     if (interf) {
@@ -747,8 +747,8 @@
       lossRxDb: 0.5,
       nfDb: band.nf,
     };
-    const dl = RP.computeLinkBudget(Object.assign({}, common, { txPowerDbm: Math.min(num(bts.props.txPowerDbm, 30), band.txMax), gTxDbi: gBts, gRxDbi: gCpe }));
-    const ul = RP.computeLinkBudget(Object.assign({}, common, { txPowerDbm: Math.min(num(cpe.props.txPowerDbm, 23), 27), gTxDbi: gCpe, gRxDbi: gBts }));
+    const dl = RP.computeLinkBudget(Object.assign({}, common, { txPowerDbm: Math.min(num(bts.props.txPowerDbm, 30), band.txMax), gTxDbi: gBts, gRxDbi: gCpe, hiddenLossDb: cpeHidden - recetteDelta(link, bts, cpe, 'dl') }));
+    const ul = RP.computeLinkBudget(Object.assign({}, common, { txPowerDbm: Math.min(num(cpe.props.txPowerDbm, 23), 27), gTxDbi: gCpe, gRxDbi: gBts, hiddenLossDb: cpeHidden - recetteDelta(link, cpe, bts, 'ul') }));
     const nCpe = Math.max(1, radioLinksOf(bts).filter((l) => l.medium === 'blr').length);
     const dlCap = (dl.capacityMbps * 0.7) / nCpe;
     const ulCap = (ul.capacityMbps * 0.3) / nCpe;
@@ -887,7 +887,10 @@
         const t0 = 60;
         hidDown += 10 * Math.log10((t0 + SP.lnbNoiseTempK(nf + hw(chain.lnb).nfAddDb)) / (t0 + SP.lnbNoiseTempK(nf)));
       }
-      const res = SP.computeSatLink({
+      const rcv = recetteVsat(ant, chain.buc, chain.lnb);
+      const hidUp0 = hidUp;
+      const hidDown0 = hidDown;
+      const satArgs = (hidUp, hidDown) => ({
         orbit: orbit.id,
         band: g.band,
         satLonDeg: g.lon,
@@ -921,6 +924,8 @@
         forward: { symbolRateMsps: num(hub.props.fwdSymbolRate, 30), maxModcod: hub.props.fwdMaxModcod },
         ret: { symbolRateMsps: num(modemP.retSymbolRate, 2), maxModcod: modemP.retMaxModcod },
       });
+      const res = SP.computeSatLink(satArgs(hidUp0 - rcv.up, hidDown0 - rcv.down));
+      const resCalc = hidUp0 || hidDown0 || rcv.up || rcv.down ? SP.computeSatLink(satArgs(0, 0)) : res;
       if (cstate) {
         const fd = SP.dopplerKHz(SP.getBand(g.band).downGHz, cstate.serving.rangeRateKmS);
         const fu = SP.dopplerKHz(SP.getBand(g.band).upGHz, cstate.serving.rangeRateKmS);
@@ -997,6 +1002,7 @@
         hub,
         chain,
         constellation: cstate,
+        measure: { fwdEsn0: res.forward.esn0, fwdEsn0Calc: resCalc.forward.esn0 },
         geo: geoR,
         ideal,
         errors: { azErr, elErr, skewErr },
@@ -1292,6 +1298,178 @@
     return `<div class="leds" title="Voyants de l’équipement (vert : normal, orange : dégradé, rouge : alarme, gris : éteint)">${leds.map((l) => `<span class="led ${l.cls}"><i></i>${esc(l.label)}</span>`).join('')}</div>`;
   }
 
+
+  /* --- Recette réaliste : écarts de terrain reproductibles (graine), fiche et rapport de recette --- */
+  const RECETTE_TOL = 3; // écart toléré entre mesure et calcul (dB)
+  function recetteCfg() {
+    return S.topo.settings.recette || null;
+  }
+  const recetteOn = () => !!(recetteCfg() && recetteCfg().actif);
+  function hash32(str) {
+    let h = 2166136261;
+    for (let i = 0; i < str.length; i++) {
+      h ^= str.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    return h >>> 0;
+  }
+  /** Tirage reproductible dans [a, b] pour une clé (graine de la recette). */
+  function recU(key, a, b) {
+    let t = (hash32(String(recetteCfg().seed) + '|' + key) + 0x6d2b79f5) >>> 0;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    const u = ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    return a + (b - a) * u;
+  }
+  /**
+   * Écart réel − calcul (dB, > 0 = mieux que le calcul) d'une liaison FH ou BLR, de l'émetteur tx vers le récepteur rx :
+   * tolérance de puissance d'émission, gains réels des antennes, pertes de branchement, propagation par ciel clair.
+   */
+  function recetteDelta(link, txNode, rxNode, dir) {
+    if (!recetteOn() || !txNode || !rxNode) return 0;
+    const g = (n) => recU('g' + n.id, -0.6, 0.3);
+    const br = (n) => recU('b' + n.id, -0.2, 0.7);
+    return recU('tx' + txNode.id, -1, 1) + g(txNode) + g(rxNode) - br(txNode) - br(rxNode) + recU('air' + link.id + dir, -0.5, 0.5);
+  }
+  /** Écarts réels d'une station VSAT (montant : BUC et antenne ; descendant : LNB et antenne). */
+  function recetteVsat(ant, buc, lnb) {
+    if (!recetteOn() || !ant) return { up: 0, down: 0 };
+    const g = recU('g' + ant.id, -0.6, 0.3);
+    return { up: g + (buc ? recU('buc' + buc.id, -1, 0.5) : 0), down: g + (lnb ? recU('lnb' + lnb.id, -0.8, 0.4) : 0) };
+  }
+  /** Lignes de la fiche de recette : une grandeur mesurable par sens de chaque liaison radio. */
+  function recetteRows() {
+    const rc = recetteCfg() || {};
+    const mes = rc.mesures || {};
+    const rows = [];
+    const add = (l, dir, what, unit, calc, real) => {
+      const key = `${l.id}:${dir}`;
+      rows.push({ key, link: linkName(l), what, unit, calc: Number.isFinite(calc) ? calc : null, real: Number.isFinite(real) ? real : null, mesure: Number.isFinite(mes[key]) ? mes[key] : null });
+    };
+    for (const l of S.topo.links) {
+      const st = l.state;
+      if (!st) continue;
+      if (l.medium === 'fh' && st.budgets && st.ends) {
+        add(l, 'ab', `RSL reçu à ${endName(st.ends.B.node)}`, 'dBm', st.budgets.ab.rslCalc, st.up ? st.budgets.ab.rsl : null);
+        add(l, 'ba', `RSL reçu à ${endName(st.ends.A.node)}`, 'dBm', st.budgets.ba.rslCalc, st.up ? st.budgets.ba.rsl : null);
+      } else if (l.medium === 'blr' && st.budgets) {
+        add(l, 'dl', `RSL reçu au CPE ${st.cpe.name}`, 'dBm', st.budgets.dl.rslCalc, st.up ? st.budgets.dl.rsl : null);
+        add(l, 'ul', `RSL reçu à la BTS ${st.bts.name}`, 'dBm', st.budgets.ul.rslCalc, st.up ? st.budgets.ul.rsl : null);
+      } else if (l.medium === 'vsat' && st.role === 'remote' && st.measure) {
+        add(l, 'fwd', `Es/N0 voie aller au modem${st.chain && st.chain.modem ? ' ' + st.chain.modem.name : ''}`, 'dB', st.measure.fwdEsn0Calc, st.up ? st.measure.fwdEsn0 : null);
+      }
+    }
+    return rows;
+  }
+  /** Conclusion d'une ligne de recette : écart = mesure − calcul. */
+  function recetteVerdict(r, tol = RECETTE_TOL) {
+    if (r.mesure === null || r.calc === null) return { code: 'nc', ecart: null, txt: r.mesure === null ? 'à mesurer' : '—' };
+    const e = r.mesure - r.calc;
+    if (e < -tol) return { code: 'los', ecart: e, txt: 'Non conforme : perte anormale à localiser' };
+    if (e > tol) return { code: 'weak', ecart: e, txt: 'Suspect : mesure meilleure que le calcul, vérifier la lecture' };
+    return { code: 'ok', ecart: e, txt: 'Conforme' };
+  }
+  function recetteTol() {
+    const rc = recetteCfg();
+    return rc && Number.isFinite(Number(rc.tol)) ? Number(rc.tol) : RECETTE_TOL;
+  }
+  function ensureRecette() {
+    if (!S.topo.settings.recette) S.topo.settings.recette = { actif: false, seed: Math.floor(Math.random() * 1e9), tol: RECETTE_TOL, mesures: {} };
+    const rc = S.topo.settings.recette;
+    rc.mesures = rc.mesures || {};
+    return rc;
+  }
+  const parseDb = (v) => {
+    const t = String(v === undefined || v === null ? '' : v).trim().replace(/\s/g, '').replace(',', '.').replace('−', '-');
+    return t === '' ? null : Number.isFinite(Number(t)) ? Number(t) : NaN;
+  };
+  /** Fiche de recette (onglet Bilan de liaison, sans sélection). */
+  function recetteFicheHtml() {
+    const rows = recetteRows();
+    const tol = recetteTol();
+    let h = `<div class="section recette"><div class="section-title">Fiche de recette</div>`;
+    if (!rows.length) return h + '<p class="small-muted">Aucune liaison radio à réceptionner.</p></div>';
+    h += recetteOn()
+      ? `<p class="small-muted">Mode <b>recette réaliste</b> : comme sur le terrain, chaque liaison réelle s’écarte un peu du calcul (tolérances des émetteurs, gains réels des antennes, connecteurs, propagation). Sélectionnez chaque liaison, relevez la valeur <b>mesurée</b> sur l’équipement de réception (onglet Bilan de liaison), saisissez-la ci-dessous puis concluez. Écart toléré : ± ${fmt(tol, 1)} dB.</p>`
+      : `<p class="small-muted">Saisissez la valeur relevée sur l’équipement de réception (onglet Bilan de liaison de chaque liaison) : l’écart avec le calcul et la conclusion s’affichent. Écart toléré : ± ${fmt(tol, 1)} dB.</p>`;
+    let teacherCol = '';
+    
+    h += `<table class="data-table recette-table"><thead><tr><th>Liaison · grandeur</th><th>Calcul</th><th>Mesure</th><th>Écart</th>${teacherCol}</tr></thead><tbody>`;
+    rows.forEach((r) => {
+      const v = recetteVerdict(r, tol);
+      let realTd = '';
+      
+      h += `<tr><td>${esc(r.link)}<br><small>${esc(r.what)}</small></td><td class="num">${r.calc === null ? '—' : fmt(r.calc, 1) + ' ' + r.unit}</td><td><input type="text" inputmode="decimal" class="rec-in" data-recette="${esc(r.key)}" value="${r.mesure === null ? '' : fmt(r.mesure, 1)}" placeholder="—" aria-label="Mesure ${esc(r.what)}"></td><td class="num st-${v.code}">${v.ecart === null ? '' : (v.ecart > 0 ? '+' : '') + fmt(v.ecart, 1) + ' dB'}<br><small>${esc(v.txt)}</small></td>${realTd}</tr>`;
+    });
+    h += '</tbody></table>';
+    
+    h += `<div class="btn-row"><button class="btn btn-xs" id="rec-rapport" title="Rapport de recette imprimable">🖨 Rapport de recette</button></div></div>`;
+    return h;
+  }
+  function bindRecetteFiche(host) {
+    $$('[data-recette]', host).forEach((inp) =>
+      inp.addEventListener('change', () => {
+        const v = parseDb(inp.value);
+        if (Number.isNaN(v)) {
+          toast('Valeur non reconnue : saisissez un nombre (ex. −42,5).', 'warn');
+          return;
+        }
+        const rc = ensureRecette();
+        if (v === null) delete rc.mesures[inp.dataset.recette];
+        else rc.mesures[inp.dataset.recette] = Math.round(v * 10) / 10;
+        if (S.locked || S.mode === 'diag') journalAdd({ kind: 'recette', target: inp.dataset.recette, value: v });
+        stat('recetteSaisie');
+        renderBudget(null);
+      })
+    );
+    const b = (id, fn) => {
+      const el = $(id, host);
+      if (el) el.addEventListener('click', fn);
+    };
+    b('#rec-rapport', openRecetteRapport);
+    
+  }
+  /** Rapport de recette : document HTML imprimable (nouvelle fenêtre). */
+  function recetteRapportHtml(technicien) {
+    const rows = recetteRows();
+    const tol = recetteTol();
+    const vs = rows.map((r) => recetteVerdict(r, tol));
+    const done = vs.filter((v) => v.code !== 'nc').length;
+    const ko = vs.filter((v) => v.code === 'los' || v.code === 'weak').length;
+    const concl = !rows.length ? 'Aucune liaison radio.' : done < rows.length ? `Recette incomplète : ${rows.length - done} mesure(s) manquante(s).` : ko ? `Recette NON CONFORME : ${ko} écart(s) hors tolérance à traiter avant la réception des travaux.` : 'Recette CONFORME : toutes les mesures sont dans la tolérance.';
+    const title = S.topo.settings.title || 'Réseau';
+    const body = `<h1>Rapport de recette radio</h1>
+      <p class="small">Réseau : <b>${esc(title)}</b> · ${esc(new Date().toLocaleString('fr-FR'))} · Technicien : ${technicien ? esc(technicien) : '..............................'}${recetteOn() ? ' · mesures sur le réseau réel (recette réaliste)' : ''}</p>
+      <p class="small">Méthode : chaque valeur mesurée sur l’équipement de réception (RSL lu sur l’IDU / l’AGC de l’ODU, Es/N0 lu sur le modem satellite), par ciel clair, est comparée au calcul du bilan de liaison. Écart toléré : ± ${fmt(tol, 1)} dB.</p>
+      <table><tr><th>Liaison</th><th>Grandeur</th><th class="num">Calcul</th><th class="num">Mesure</th><th class="num">Écart</th><th>Conclusion</th></tr>
+      ${rows.map((r, i) => `<tr><td>${esc(r.link)}</td><td>${esc(r.what)}</td><td class="num">${r.calc === null ? '—' : fmt(r.calc, 1) + ' ' + r.unit}</td><td class="num">${r.mesure === null ? '' : fmt(r.mesure, 1) + ' ' + r.unit}</td><td class="num">${vs[i].ecart === null ? '' : (vs[i].ecart > 0 ? '+' : '') + fmt(vs[i].ecart, 1) + ' dB'}</td><td class="st-${vs[i].code}">${esc(vs[i].code === 'nc' ? '' : vs[i].txt)}</td></tr>`).join('')}</table>
+      <p class="concl"><b>${esc(concl)}</b></p>
+      <p class="visas">Visa du technicien : ........................ Visa du responsable de la recette : ........................ Date : ............</p>`;
+    return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>Rapport de recette — ${esc(title)}</title><style>
+      @page { size: A4; margin: 14mm 12mm; } body { font: 12px/1.45 system-ui, "Segoe UI", sans-serif; color: #111; max-width: 190mm; margin: 0 auto; padding: 10mm 0; background: #fff; }
+      h1 { font-size: 20px; color: #0e7490; border-bottom: 2px solid #0e7490; padding-bottom: 4px; } table { border-collapse: collapse; width: 100%; margin: 8px 0; }
+      td, th { border: 1px solid #c4ccd6; padding: 4px 6px; text-align: left; vertical-align: top; } th { background: #eef4f8; } .num { text-align: right; white-space: nowrap; }
+      .small { font-size: 11px; color: #374151; } .st-ok { color: #15803d; } .st-weak { color: #b45309; } .st-los { color: #b91c1c; } .concl { font-size: 13px; margin-top: 10px; } .visas { margin-top: 12mm; }
+      </style></head><body>${body}<p class="small">MicroWave, BLR &amp; VSAT Lab</p></body></html>`;
+  }
+  function openRecetteRapport() {
+    let who = '';
+    try {
+      who = localStorage.getItem('mbv-auteur') || '';
+    } catch (e) {
+      /* stockage indisponible */
+    }
+    const html = recetteRapportHtml(S.examActive ? '' : who);
+    const w = window.open('', '_blank');
+    if (!w) return toast('Fenêtre bloquée par le navigateur : autorisez les fenêtres surgissantes.', 'error');
+    w.document.write(html);
+    w.document.close();
+    w.focus();
+    setTimeout(() => w.print(), 400);
+    if (S.locked || S.mode === 'diag') journalAdd({ kind: 'recette', target: 'rapport' });
+    stat('recetteRapport');
+  }
+
   function computeWired(link) {
     const na = nodeById(link.a);
     const nb = nodeById(link.b);
@@ -1396,6 +1574,7 @@
     renderFlowsTable();
     updateStatusBar();
     evaluateLab();
+    scheduleSessionSave();
   }
   function scheduleUpdate(opts) {
     if (S.computeQueued) return;
@@ -1436,15 +1615,153 @@
   function initDefs() {
     clear(L.defs);
     const gs = el('linearGradient', { id: 'grad-space', x1: 0, y1: 0, x2: 0, y2: 1 }, L.defs);
-    el('stop', { offset: '0%', 'stop-color': '#02040b' }, gs);
-    el('stop', { offset: '75%', 'stop-color': '#0a1033' }, gs);
-    el('stop', { offset: '100%', 'stop-color': '#16245a' }, gs);
+    el('stop', { offset: '0%', 'stop-color': cssVar('--sky-0', '#02040b') }, gs);
+    el('stop', { offset: '75%', 'stop-color': cssVar('--sky-1', '#0a1033') }, gs);
+    el('stop', { offset: '100%', 'stop-color': cssVar('--sky-2', '#16245a') }, gs);
     const ge = el('linearGradient', { id: 'grad-earth', x1: 0, y1: 0, x2: 0, y2: 1 }, L.defs);
-    el('stop', { offset: '0%', 'stop-color': '#10203a' }, ge);
-    el('stop', { offset: '8%', 'stop-color': '#0c1626' }, ge);
-    el('stop', { offset: '100%', 'stop-color': '#0a1320' }, ge);
+    el('stop', { offset: '0%', 'stop-color': cssVar('--ground-0', '#10203a') }, ge);
+    el('stop', { offset: '8%', 'stop-color': cssVar('--ground-1', '#0c1626') }, ge);
+    el('stop', { offset: '100%', 'stop-color': cssVar('--ground-2', '#0a1320') }, ge);
     const pat = el('pattern', { id: 'pat-rain', width: 14, height: 14, patternUnits: 'userSpaceOnUse', patternTransform: 'rotate(15)' }, L.defs);
-    el('line', { x1: 7, y1: 0, x2: 7, y2: 8, stroke: '#93c5fd', 'stroke-width': 1.2, 'stroke-linecap': 'round' }, pat);
+    el('line', { x1: 7, y1: 0, x2: 7, y2: 8, stroke: cssVar('--rain-stroke', '#93c5fd'), 'stroke-width': 1.2, 'stroke-linecap': 'round' }, pat);
+  }
+
+  /* --- Ergonomie : thème, panneaux redimensionnables, session restaurée --- */
+  const cssVar = (name, def) => {
+    const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    return v || def;
+  };
+  const lsGetE = (k) => {
+    try {
+      return localStorage.getItem(k);
+    } catch (e) {
+      return null;
+    }
+  };
+  const lsSetE = (k, v) => {
+    try {
+      if (v === null) localStorage.removeItem(k);
+      else localStorage.setItem(k, v);
+    } catch (e) {
+      /* stockage indisponible : réglage non mémorisé */
+    }
+  };
+  function currentTheme() {
+    return document.documentElement.dataset.theme === 'light' ? 'light' : 'dark';
+  }
+  function applyTheme(t, opts = {}) {
+    if (t === 'light') document.documentElement.dataset.theme = 'light';
+    else delete document.documentElement.dataset.theme;
+    if (!opts.temporary) lsSetE('mbv-theme', t === 'light' ? 'light' : null);
+    initDefs();
+    render();
+    if (!opts.temporary) {
+      renderInspector({ keepProps: true });
+      stat('theme_' + t);
+    }
+  }
+  /** Poignées de redimensionnement : boîte à outils, inspecteur, console. */
+  const LAYOUT_VARS = { left: '--left-w', right: '--right-w', console: '--console-h' };
+  const LAYOUT_LIMITS = { left: [180, 480], right: [300, 720], console: [90, 520] };
+  function initResizers() {
+    let saved = {};
+    try {
+      saved = JSON.parse(lsGetE('mbv-layout') || '{}') || {};
+    } catch (e) {
+      saved = {};
+    }
+    for (const [k, v] of Object.entries(saved)) if (LAYOUT_VARS[k] && Number.isFinite(v)) document.documentElement.style.setProperty(LAYOUT_VARS[k], v + 'px');
+    const save = () => {
+      const o = {};
+      for (const [k, name] of Object.entries(LAYOUT_VARS)) {
+        const v = document.documentElement.style.getPropertyValue(name);
+        if (v) o[k] = parseFloat(v);
+      }
+      lsSetE('mbv-layout', Object.keys(o).length ? JSON.stringify(o) : null);
+    };
+    $$('.resizer').forEach((h) => {
+      const k = h.dataset.resize;
+      h.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        try {
+          h.setPointerCapture(e.pointerId);
+        } catch (err) {
+          /* pointeur non capturable (événement simulé) : le glisser fonctionne quand même */
+        }
+        h.classList.add('dragging');
+        document.body.classList.add('resizing');
+        const start = { x: e.clientX, y: e.clientY, w: $('#toolbox').offsetWidth, r: $('#inspector').offsetWidth, c: $('#console').offsetHeight };
+        const move = (ev) => {
+          const [lo, hi] = LAYOUT_LIMITS[k];
+          const val = k === 'left' ? start.w + ev.clientX - start.x : k === 'right' ? start.r - (ev.clientX - start.x) : start.c - (ev.clientY - start.y);
+          document.documentElement.style.setProperty(LAYOUT_VARS[k], Math.round(Math.max(lo, Math.min(hi, val))) + 'px');
+          applyView();
+        };
+        const up = () => {
+          h.classList.remove('dragging');
+          document.body.classList.remove('resizing');
+          h.removeEventListener('pointermove', move);
+          h.removeEventListener('pointerup', up);
+          save();
+          applyView();
+        };
+        h.addEventListener('pointermove', move);
+        h.addEventListener('pointerup', up);
+      });
+      h.addEventListener('dblclick', () => {
+        document.documentElement.style.removeProperty(LAYOUT_VARS[k]);
+        save();
+        applyView();
+      });
+    });
+  }
+  /* Session : la topologie, la vue, le mode et le TP en cours sont mémorisés sur le poste et restaurés à l'ouverture. */
+  const LS_SESSION = 'mbv-session-v1';
+  let sessionTimer = null;
+  function scheduleSessionSave() {
+    if (S.examActive || S.restoringSession) return;
+    clearTimeout(sessionTimer);
+    sessionTimer = setTimeout(saveSession, 700);
+  }
+  function saveSession() {
+    if (S.examActive) return;
+    if (!S.topo.nodes.length) {
+      lsSetE(LS_SESSION, null);
+      return;
+    }
+    const data = { savedAt: Date.now(), topo: serialize(), view: S.view, mode: S.mode, labId: S.lab ? S.lab.id : null, labStep: S.labStep || 0 };
+    lsSetE(LS_SESSION, JSON.stringify(data));
+  }
+  /** Restaure la dernière session (sauf examen en cours, repris par exam.js). */
+  function restoreSession() {
+    if (lsGetE('mbv-examen-en-cours-v1')) return false;
+    let d = null;
+    try {
+      d = JSON.parse(lsGetE(LS_SESSION) || 'null');
+    } catch (e) {
+      d = null;
+    }
+    if (!d || !d.topo || !Array.isArray(d.topo.nodes) || !d.topo.nodes.length) return false;
+    S.restoringSession = true;
+    try {
+      loadTopology(d.topo, { silent: true });
+      if (d.view && Number.isFinite(d.view.k)) S.view = d.view;
+      setMode(d.mode || 'design');
+      const lab = d.labId ? findActivity(d.labId) : null;
+      if (lab) {
+        S.lab = lab;
+        S.labStep = Math.min(Math.max(0, d.labStep || 0), lab.steps.length - 1);
+        $('#lab-coach').hidden = false;
+        renderCoach();
+      }
+    } finally {
+      S.restoringSession = false;
+    }
+    update();
+    applyView();
+    const when = new Date(d.savedAt || Date.now()).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+    log(`↺ Session restaurée (${when}) : « ${S.topo.settings.title || 'Topologie sans titre'} ». « Nouveau » pour repartir d’une page blanche.`, 'info');
+    return true;
   }
 
   function visibleWorld() {
@@ -2309,9 +2626,14 @@
 
   function initKeyboard() {
     document.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's' && S.examActive && MBV.Exam && MBV.Exam.active && MBV.Exam.active()) {
+        e.preventDefault();
+        MBV.Exam.submitAsk();
+        return;
+      }
       const tag = (e.target.tagName || '').toLowerCase();
       if (tag === 'input' || tag === 'select' || tag === 'textarea') return;
-      if (!$('#modal-labs').hidden || !$('#modal-docs').hidden || !$('#modal-dialog').hidden) {
+      if ($$('.modal').some((m) => !m.hidden)) {
         if (e.key === 'Escape') closeModals();
         return;
       }
@@ -3154,7 +3476,9 @@
 
   function renderBudget(l, selNode) {
     if (!l || !l.state) {
-      ipaneBudget.innerHTML = '<div class="empty-state"><p>Sélectionnez une liaison radio (FH, BLR ou VSAT), ou un équipement qui en fait partie, pour afficher son bilan détaillé pas à pas.</p></div>';
+      const radio = S.topo.links.some((x) => RADIO_MEDIA.includes(x.medium));
+      ipaneBudget.innerHTML = '<div class="empty-state"><p>Sélectionnez une liaison radio (FH, BLR ou VSAT), ou un équipement qui en fait partie, pour afficher son bilan détaillé pas à pas.</p></div>' + (radio ? recetteFicheHtml() : '');
+      if (radio) bindRecetteFiche(ipaneBudget);
       return;
     }
     const st = l.state;
@@ -4032,6 +4356,7 @@
     pushHistory();
     closeLab();
     loadTopology({ nodes: [], links: [], flows: [], settings: { title: 'Topologie sans titre', scaleKm: 2 } });
+    lsSetE(LS_SESSION, null);
     S.view = { x: 40, y: 10, k: 1 };
     applyView();
   }
@@ -4056,6 +4381,7 @@
     r.onload = () => {
       try {
         const json = JSON.parse(r.result);
+        if (MBV.Exam && typeof MBV.Exam.openJson === 'function' && MBV.Exam.openJson(json)) return;
         if (json.format && json.format !== 'mbv-lab') throw new Error('Ce fichier n’est pas une topologie MicroWave, BLR & VSAT Lab.');
         pushHistory();
         closeLab();
@@ -4070,7 +4396,8 @@
   }
 
   /** Export SVG autonome (styles calculés intégrés, icônes incluses). */
-  function exportSvg() {
+  /** Image SVG autonome du canevas tel qu'affiché (styles calculés intégrés, icônes incluses). */
+  function svgString() {
     const clone = svg.cloneNode(true);
     const props = ['fill', 'stroke', 'stroke-width', 'stroke-dasharray', 'opacity', 'font-size', 'font-family', 'font-weight', 'text-anchor', 'color', 'paint-order', 'stroke-linecap', 'letter-spacing', 'dominant-baseline'];
     const src = svg.querySelectorAll('*');
@@ -4093,7 +4420,10 @@
     clone.setAttribute('height', r.height);
     clone.setAttribute('viewBox', `0 0 ${r.width} ${r.height}`);
     clone.setAttribute('xmlns', SVGNS);
-    const data = '<?xml version="1.0" encoding="UTF-8"?>\n' + new XMLSerializer().serializeToString(clone);
+    return '<?xml version="1.0" encoding="UTF-8"?>\n' + new XMLSerializer().serializeToString(clone);
+  }
+  function exportSvg() {
+    const data = svgString();
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([data], { type: 'image/svg+xml' }));
     a.download = (S.topo.settings.title || 'schema').replace(/[^\p{L}\p{N}_-]+/gu, '_') + '.svg';
@@ -4107,6 +4437,7 @@
     stat('exportSvg');
   }
 
+  
   /* --- Modales --- */
   function openModal(id) {
     $('#' + id).hidden = false;
@@ -4144,6 +4475,7 @@
   const ACT_TABS = [
     { id: 'tuto', label: 'Tutoriels', list: tutoList },
     { id: 'tp', label: 'Travaux pratiques', list: labsList },
+    { id: 'ex', label: 'Exemples', list: () => (MBV.Labs && Array.isArray(MBV.Labs.examples) && !S.examActive ? MBV.Labs.examples : []) },
     {
       id: 'exo',
       label: 'Exercices corrigés',
@@ -4164,10 +4496,12 @@
     if (!tab) tab = id && tutoList().some((t) => t.id === id) ? 'tuto' : id && labsList().some((l) => l.id === id) ? 'tp' : S.actTab || 'tp';
     const tabs = ACT_TABS.filter((t) => t.list().length);
     if (!tabs.some((t) => t.id === tab)) tab = tabs.length ? tabs[0].id : 'tp';
-    S.actTab = tab;
+    if (tab !== 'exam') S.actTab = tab;
+    $('#labs-title').textContent = tab === 'exam' ? 'Examen' : 'Activités pédagogiques';
     const nav = $('#labs-list');
     const det = $('#labs-detail');
     const tabsHtml = `<div class="act-tabs">${tabs
+      .filter((t) => t.id !== 'exam')
       .map((t) => `<button class="act-tab ${t.id === tab ? 'active' : ''}" data-acttab="${t.id}">${esc(t.label)} ${t.noCount ? (S.examActive && t.id === 'exam' ? '<span class="act-count exam-live">en cours</span>' : '') : `<span class="act-count">${t.list().length}</span>`}</button>`)
       .join('')}</div>`;
     if (!tabs.length) {
@@ -4177,8 +4511,7 @@
       return;
     }
     if (tab === 'exam' && MBV.Exam) {
-      nav.innerHTML = tabsHtml + '<div id="exam-nav"></div>';
-      bindActTabs(nav);
+      nav.innerHTML = '<div id="exam-nav"></div>';
       MBV.Exam.render({ nav: $('#exam-nav'), detail: det, api: API });
       openModal('modal-labs');
       return;
@@ -4201,6 +4534,14 @@
     bindActTabs(nav);
     $$('[data-lab]', nav).forEach((b) => b.addEventListener('click', () => openLabs(b.dataset.lab, tab)));
     if ($('#lab-sheets-all')) $('#lab-sheets-all').addEventListener('click', () => printStudentSheets(labsList()));
+    if (tab === 'ex') {
+      det.innerHTML = `<div class="lab-header"><div><div class="small-muted">Exemple ${esc(cur.num)} · réseau prêt à explorer, sans consignes</div><h3>${esc(cur.title)}</h3><div class="lab-tags">${(cur.tags || []).map((t) => `<span class="tag ${t}">${esc(t.toUpperCase())}</span>`).join('')}</div></div><div class="btn-row" style="margin:0"><button class="btn btn-accent" id="ex-load">Charger l’exemple</button></div></div>
+        <p class="small-muted">${esc(cur.subtitle || '')}</p><div class="doc">${cur.desc || ''}</div>
+        <div class="tip">L’exemple remplace la topologie du canevas : sauvegardez d’abord votre travail. Vous pouvez ensuite le modifier librement et l’enregistrer sous un autre nom.</div>`;
+      $('#ex-load').addEventListener('click', () => startExample(cur.id));
+      openModal('modal-labs');
+      return;
+    }
     if (tab === 'tuto') {
       det.innerHTML = `<div class="lab-header"><div><div class="small-muted">Tutoriel ${esc(cur.num)} · durée ${esc(cur.duration || '15 min')} · ${cur.steps.length} étapes</div><h3>${esc(cur.title)}</h3><div class="lab-tags">${(cur.tags || []).map((t) => `<span class="tag ${t}">${esc(t.toUpperCase())}</span>`).join('')}</div></div><div class="btn-row" style="margin:0"><button class="btn btn-accent" id="lab-start">▶ Démarrer le tutoriel</button></div></div>
         ${cur.context ? `<div class="doc">${cur.context}</div>` : ''}
@@ -4211,7 +4552,9 @@
       openModal('modal-labs');
       return;
     }
-    det.innerHTML = `<div class="lab-header"><div><div class="small-muted">${esc(cur.num)} · durée ${esc(cur.duration || '2 h')} · niveau ${esc(cur.level || 'Bac Pro')}</div><h3>${esc(cur.title)}</h3><div class="lab-tags">${(cur.tags || []).map((t) => `<span class="tag ${t}">${esc(t.toUpperCase())}</span>`).join('')}</div></div><div class="btn-row" style="margin:0"><button class="btn btn-accent" id="lab-start">Charger la topologie du TP</button>${hasAnswerKeys() ? `<button class="btn ${S.teacher ? 'btn-teacher-on' : ''}" id="lab-teacher" title="Afficher / masquer le corrigé (réservé à l’enseignant)">${S.teacher ? '🔓 Masquer le corrigé' : '🔒 Corrigé enseignant'}</button>` : ''}<button class="btn" id="lab-sheet" title="Fiche à distribuer aux élèves : en-tête nominatif, relevés de mesures, questions avec lignes de réponse (jamais de corrigé)">📄 Fiche élève</button><button class="btn" id="lab-print" title="Imprimer cette page${S.teacher ? ' avec le corrigé' : ''}">🖨 Imprimer</button></div></div>
+    let solBtn = '';
+    
+    det.innerHTML = `<div class="lab-header"><div><div class="small-muted">${esc(cur.num)} · durée ${esc(cur.duration || '2 h')} · niveau ${esc(cur.level || 'Bac Pro')}</div><h3>${esc(cur.title)}</h3><div class="lab-tags">${(cur.tags || []).map((t) => `<span class="tag ${t}">${esc(t.toUpperCase())}</span>`).join('')}</div></div><div class="btn-row" style="margin:0"><button class="btn btn-accent" id="lab-start">Charger la topologie du TP</button>${solBtn}${hasAnswerKeys() ? `<button class="btn ${S.teacher ? 'btn-teacher-on' : ''}" id="lab-teacher" title="Afficher / masquer le corrigé (réservé à l’enseignant)">${S.teacher ? '🔓 Masquer le corrigé' : '🔒 Corrigé enseignant'}</button>` : ''}<button class="btn" id="lab-sheet" title="Fiche à distribuer aux élèves : en-tête nominatif, relevés de mesures, questions avec lignes de réponse (jamais de corrigé)">📄 Fiche élève</button><button class="btn" id="lab-print" title="Imprimer cette page${S.teacher ? ' avec le corrigé' : ''}">🖨 Imprimer</button></div></div>
       ${S.teacher ? '<div class="teacher-banner">Mode enseignant : le corrigé est affiché sous chaque question. Pensez à le masquer avant de laisser le poste aux élèves.</div>' : ''}
       ${cur.context ? `<h4>Contexte</h4><div class="doc">${cur.context}</div>` : ''}
       ${cur.objectives ? `<h4>Objectifs</h4><ul>${cur.objectives.map((o) => `<li>${esc(o)}</li>`).join('')}</ul>` : ''}
@@ -4283,25 +4626,27 @@
   }
   
 
-  function startLab(id) {
+  function startLab(id, opts = {}) {
     if (lockedMsg()) return;
     const lab = findActivity(id);
     if (!lab) return;
     const tuto = isTutorial(lab);
-    const what = tuto ? `le tutoriel ${lab.num}` : `la topologie du ${lab.num}`;
+    const sol = !!opts.solution && typeof lab.solution === 'function';
+    const what = tuto ? `le tutoriel ${lab.num}` : sol ? `la correction du ${lab.num}` : `la topologie du ${lab.num}`;
     if (S.topo.nodes.length && !confirm(`Démarrer ${what} ? La topologie actuelle sera remplacée (pensez à la sauvegarder).`)) return;
     S.stats = {};
     S.lastPing = null;
     pushHistory();
-    const topo = typeof lab.build === 'function' ? lab.build(API) : lab.topology;
-    topo.settings = Object.assign({ title: `${lab.num} — ${lab.title}`, labId: lab.id }, topo.settings || {});
+    let topo = typeof lab.build === 'function' ? lab.build(API) : lab.topology;
+    if (sol) topo = lab.solution(topo) || topo;
+    topo.settings = Object.assign({ title: `${lab.num} — ${lab.title}${sol ? ' (correction)' : ''}`, labId: lab.id }, topo.settings || {});
     loadTopology(topo);
     if (lab.mode) setMode(lab.mode);
     else setMode('design');
     S.lab = lab;
     S.labStep = 0;
     S.journal = [];
-    if (lab.faults) {
+    if (lab.faults && !sol) {
       const done = randomFaults(lab.faults.count || 3, { kinds: lab.faults.kinds || null });
       log(`🚨 Centre de supervision : ${done.length} incident(s) en cours sur le réseau. À vous de les localiser et de les corriger.`, 'error');
     }
@@ -4310,6 +4655,24 @@
     $('#lab-coach').classList.remove('minimized');
     renderCoach();
     log(`▶ ${tuto ? 'Tutoriel ' : ''}${lab.num} démarré : ${lab.title}`, 'ok');
+    if (sol) log(`🔑 Topologie de correction du ${lab.num} : ${lab.solutionNote || 'état attendu en fin de TP'}`, 'warn');
+  }
+  /** Charge un exemple de la bibliothèque (réseau prêt à explorer, sans consignes). */
+  function startExample(id) {
+    if (lockedMsg()) return;
+    const ex = ((MBV.Labs && MBV.Labs.examples) || []).find((e) => e.id === id);
+    if (!ex) return;
+    if (S.topo.nodes.length && !confirm(`Charger l’exemple « ${ex.title} » ? La topologie actuelle sera remplacée (pensez à la sauvegarder).`)) return;
+    pushHistory();
+    closeLab();
+    const topo = ex.build();
+    topo.settings = Object.assign({ title: `Exemple — ${ex.title}` }, topo.settings || {}, { labId: null });
+    loadTopology(topo);
+    setMode(ex.mode || 'design');
+    S.journal = [];
+    closeModals();
+    log(`📂 Exemple chargé : ${ex.title}.`, 'ok');
+    stat('example_' + ex.id);
   }
   function closeLab() {
     S.lab = null;
@@ -4404,35 +4767,79 @@
     });
   }
 
-  /* --- Documentation --- */
-  function openDocs(chapterId) {
-    const course = MBV.Course;
+  /* --- Documentation (docs.js : guide, instruments, fiches ; labs.js : cours) --- */
+  let docState = { chap: null, q: '' };
+  function docChapters() {
+    if (MBV.Docs && Array.isArray(MBV.Docs.chapters)) return MBV.Docs.chapters;
+    return MBV.Course && Array.isArray(MBV.Course.chapters) ? MBV.Course.chapters : [];
+  }
+  const docText = (c) => [c.title, c.intro || ''].concat((c.sections || []).map((s) => s.title + ' ' + s.html)).join(' ').replace(/<[^>]+>/g, ' ');
+  const docNorm = (t) => String(t).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  /** Ouvre la documentation sur un chapitre (et éventuellement une section). */
+  function openDocs(chapterId, sectionId) {
+    const chapters = docChapters();
     const nav = $('#docs-toc');
     const content = $('#docs-content');
-    if (!course || !Array.isArray(course.chapters) || !course.chapters.length) {
+    if (!chapters.length) {
       nav.innerHTML = '';
-      content.innerHTML = '<p>Le cours n’est pas chargé (fichier <code>labs.js</code> absent).</p>';
+      content.innerHTML = '<p>La documentation n’est pas chargée (fichiers <code>labs.js</code> / <code>docs.js</code> absents).</p>';
       openModal('modal-docs');
       return;
     }
-    const cur = course.chapters.find((c) => c.id === chapterId) || course.chapters[0];
-    nav.innerHTML = course.chapters
-      .map(
-        (c, i) =>
-          `<button class="nav-item ${c.id === cur.id ? 'active' : ''}" data-chap="${esc(c.id)}"><span class="nav-num">${i + 1}.</span>${esc(c.title)}</button>` +
-          (c.id === cur.id ? (c.sections || []).map((s) => `<button class="nav-item nav-sub" data-sec="${esc(s.id)}">${esc(s.title)}</button>`).join('') : '')
-      )
-      .join('');
-    content.innerHTML = `<h2>${esc(cur.title)}</h2>${cur.intro || ''}` + (cur.sections || []).map((s) => `<section id="doc-${esc(s.id)}"><h3>${esc(s.title)}</h3>${s.html}</section>`).join('');
+    const cur = chapters.find((c) => c.id === chapterId) || chapters.find((c) => c.id === docState.chap) || chapters[0];
+    docState.chap = cur.id;
+    renderDocsNav();
+    content.innerHTML = `<div class="small-muted doc-group">${esc(cur.group || '')}</div><h2>${esc(cur.title)}</h2>${cur.intro || ''}` + (cur.sections || []).map((s) => `<section id="doc-${esc(s.id)}"><h3>${esc(s.title)}</h3>${s.html}</section>`).join('');
     content.scrollTop = 0;
-    $$('[data-chap]', nav).forEach((b) => b.addEventListener('click', () => openDocs(b.dataset.chap)));
-    $$('[data-sec]', nav).forEach((b) =>
-      b.addEventListener('click', () => {
-        const t = document.getElementById('doc-' + b.dataset.sec);
-        if (t) t.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    $$('a[data-doc]', content).forEach((x) =>
+      x.addEventListener('click', (e) => {
+        e.preventDefault();
+        openDocs(x.dataset.doc, x.dataset.sec);
       })
     );
     openModal('modal-docs');
+    if (sectionId) {
+      const t = document.getElementById('doc-' + sectionId);
+      if (t) t.scrollIntoView({ block: 'start' });
+    }
+    stat('doc_' + cur.id);
+  }
+  /** Sommaire par rubriques ; filtré par la recherche. */
+  function renderDocsNav() {
+    const chapters = docChapters();
+    const nav = $('#docs-toc');
+    const q = docNorm(docState.q.trim());
+    const list = q ? chapters.filter((c) => docNorm(docText(c)).includes(q)) : chapters;
+    const groups = [];
+    for (const c of list) {
+      const g = c.group || 'Documentation';
+      let e = groups.find((x) => x.g === g);
+      if (!e) groups.push((e = { g, items: [] }));
+      e.items.push(c);
+    }
+    nav.innerHTML = groups.length
+      ? groups
+          .map(
+            (e) =>
+              `<div class="nav-group">${esc(e.g)}</div>` +
+              e.items
+                .map((c) => {
+                  const active = c.id === docState.chap;
+                  const secs = (c.sections || []).filter((s) => !q || docNorm(s.title + ' ' + s.html.replace(/<[^>]+>/g, ' ')).includes(q));
+                  return `<button class="nav-item ${active ? 'active' : ''}" data-chap="${esc(c.id)}">${esc(c.title)}</button>` + (active || q ? secs.map((s) => `<button class="nav-item nav-sub" data-chap="${esc(c.id)}" data-sec="${esc(s.id)}">${esc(s.title)}</button>`).join('') : '');
+                })
+                .join('')
+          )
+          .join('')
+      : '<p class="small-muted">Aucun résultat.</p>';
+    $$('[data-chap]', nav).forEach((b) =>
+      b.addEventListener('click', () => {
+        if (b.dataset.sec && b.dataset.chap === docState.chap) {
+          const t = document.getElementById('doc-' + b.dataset.sec);
+          if (t) t.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        } else openDocs(b.dataset.chap, b.dataset.sec);
+      })
+    );
   }
 
   /* ------------------------------------------------------------------
@@ -4580,6 +4987,17 @@
       const n = API.node(q);
       return n ? Object.assign({ handovers: 0, gaps: 0 }, S.satHist[n.id] || {}) : null;
     },
+    /** Sélectionne un équipement (nom ou id) et ouvre un onglet de l'inspecteur. */
+    focusNode(qn, tab) {
+      const n = API.node(qn);
+      if (!n) return false;
+      closeModals();
+      select({ kind: 'node', id: n.id });
+      render();
+      renderInspector();
+      if (tab) activateInspectorTab(tab);
+      return true;
+    },
     /** Sélectionne une liaison (désignée par ses équipements ou sites) et ouvre un onglet de l'inspecteur. */
     focusLink(qa, qb, tab) {
       const l = API.link(qa, qb);
@@ -4640,8 +5058,25 @@
     toast,
     update: () => update(),
     load: (json) => loadTopology(json),
+    /** Fiche de recette : lignes (calcul, réel, mesure saisie) et conclusions. */
+    recetteRows: () => recetteRows().map((r) => Object.assign({}, r, { tol: recetteTol(), verdict: recetteVerdict(r, recetteTol()) })),
+    recetteOn: () => recetteOn(),
+    recetteSet(cfg) {
+      Object.assign(ensureRecette(), cfg || {});
+      update();
+    },
+    recetteRapportHtml: (who) => recetteRapportHtml(who),
+    theme: () => currentTheme(),
+    setTheme: (t) => applyTheme(t),
+    saveSession: () => saveSession(),
+    /** Charge une topologie sans recadrer la vue ni l'annoncer (sujets individuels). */
+    loadQuiet: (json) => loadTopology(json, { keepView: true, silent: true }),
+    /** Fenêtre d'information (titre, HTML) avec un bouton Fermer. */
+    dialog: (title, html) => openDialog(title, html, [{ label: 'Fermer', cls: 'btn-accent' }]),
+    
     serialize,
     startLab,
+    startExample,
     openLabs,
     openDocs,
     catalog: CATALOG,
@@ -4674,6 +5109,13 @@
     $('#rain-slider').addEventListener('input', (e) => setRain(e.target.value));
     $('#btn-labs').addEventListener('click', () => openLabs(S.lab ? S.lab.id : undefined));
     $('#btn-docs').addEventListener('click', () => openDocs());
+    $('#btn-theme').addEventListener('click', () => applyTheme(currentTheme() === 'light' ? 'dark' : 'light'));
+    $('#btn-exam').addEventListener('click', () => openLabs(undefined, 'exam'));
+    
+    $('#docs-search').addEventListener('input', (e) => {
+      docState.q = e.target.value;
+      renderDocsNav();
+    });
     $$('[data-close]').forEach((b) => b.addEventListener('click', () => ($('#' + b.dataset.close).hidden = true)));
     $$('.modal').forEach((m) =>
       m.addEventListener('pointerdown', (e) => {
@@ -4733,9 +5175,11 @@
     setTool('select');
     setMode('design');
     setRain(0, { silent: true });
+    initResizers();
     update();
     applyView();
     log('Bienvenue dans MicroWave, BLR & VSAT Lab. Glissez des équipements sur le canevas ou ouvrez un TP.', 'info');
+    restoreSession();
     if (labsList().length) log(`${labsList().length} TP disponibles : bouton « Travaux Pratiques (TP) ».`, 'info');
     document.body.classList.add(TEACHER ? 'ed-enseignant' : 'ed-eleve');
     if (!TEACHER) {

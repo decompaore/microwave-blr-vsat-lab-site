@@ -6,6 +6,7 @@
   <title>MicroWave, BLR &amp; VSAT Lab</title>
   <meta name="description" content="Simulateur pédagogique de réseaux Faisceaux Hertziens, Boucle Locale Radio et VSAT — Bac Pro Télécommunications." />
   <link rel="stylesheet" href="style.css" />
+  <script>try { if (localStorage.getItem('mbv-theme') === 'light') document.documentElement.dataset.theme = 'light'; } catch (e) {}</script>
 </head>
 <body data-mode="design">
 
@@ -108,8 +109,11 @@
     </div>
 
     <div class="topbar-group">
-      <button class="btn btn-accent" id="btn-labs"><svg class="i"><use href="#ico-lab"/></svg><span>Travaux Pratiques (TP)</span></button>
-      <button class="btn" id="btn-docs"><svg class="i"><use href="#ico-book"/></svg><span>Documentation</span></button>
+      <button class="btn btn-accent" id="btn-labs" title="Tutoriels, travaux pratiques et exercices corrigés"><svg class="i"><use href="#ico-lab"/></svg><span class="lbl-long">Travaux Pratiques (TP)</span><span class="lbl-short">TP</span></button>
+      <button class="btn" id="btn-exam" title="Examen : passer une épreuve à partir d’un sujet ; version enseignant : créer des sujets, sujets individuels, corriger les copies"><span class="exam-ico">🎓</span><span class="lbl-long">Examen</span></button>
+      
+      <button class="btn btn-icon" id="btn-theme" title="Thème clair / sombre (mémorisé sur ce poste)" aria-label="Changer de thème">◐</button>
+      <button class="btn" id="btn-docs" title="Guide de l’utilisateur, instruments de mesure, fiches d’ingénierie et cours"><svg class="i"><use href="#ico-book"/></svg><span>Documentation</span></button>
     </div>
   </header>
 
@@ -119,6 +123,7 @@
          2. PANNEAU GAUCHE — BOÎTE À OUTILS
          =============================================================== -->
     <aside class="panel toolbox" id="toolbox" aria-label="Boîte à outils">
+      <div class="resizer" data-resize="left" title="Tirer pour élargir la boîte à outils (double-clic : largeur par défaut)"></div>
       <div class="panel-head">
         <h2>Boîte à outils</h2>
         <input type="search" id="palette-search" class="search" placeholder="Rechercher…" aria-label="Rechercher un équipement" />
@@ -257,6 +262,7 @@
 
       <!-- Console / Journal (bas du canevas) -->
       <div class="console" id="console">
+        <div class="resizer" data-resize="console" title="Tirer pour agrandir la console (double-clic : hauteur par défaut)"></div>
         <div class="console-tabs" role="tablist">
           <button class="ctab active" data-ctab="log" role="tab">Journal d’événements</button>
           <button class="ctab" data-ctab="term" role="tab">Console (ping / traceroute)</button>
@@ -279,6 +285,7 @@ Utilisez l’outil Ping (P) puis cliquez sur deux terminaux.
          4. PANNEAU DROIT — INSPECTEUR & ANALYSEURS
          =============================================================== -->
     <aside class="panel inspector" id="inspector" aria-label="Inspecteur">
+      <div class="resizer" data-resize="right" title="Tirer pour élargir l’inspecteur (double-clic : largeur par défaut)"></div>
       <div class="panel-head">
         <h2 id="insp-title">Inspecteur</h2>
         <span id="insp-subtitle" class="insp-sub">Aucune sélection</span>
@@ -343,16 +350,17 @@ Utilisez l’outil Ping (P) puis cliquez sur deux terminaux.
   <div class="modal" id="modal-docs" role="dialog" aria-modal="true" aria-labelledby="docs-title" hidden>
     <div class="modal-box modal-wide">
       <div class="modal-head">
-        <h2 id="docs-title">Cours FH, BLR, VSAT &amp; Microwave IP</h2>
+        <h2 id="docs-title">Documentation — Guide de l’utilisateur &amp; Cours FH, BLR, VSAT</h2>
         <button class="btn btn-icon btn-ghost modal-close" data-close="modal-docs" title="Fermer"><svg class="i"><use href="#ico-close"/></svg></button>
       </div>
       <div class="modal-split">
-        <nav class="modal-nav" id="docs-toc" aria-label="Sommaire du cours"></nav>
+        <div class="modal-nav docs-nav"><input type="search" id="docs-search" class="search" placeholder="Rechercher dans la documentation…" aria-label="Rechercher dans la documentation" /><nav id="docs-toc" aria-label="Sommaire de la documentation"></nav></div>
         <article class="modal-content doc" id="docs-content"></article>
       </div>
     </div>
   </div>
 
+  
   <!-- Boîte de dialogue générique (flux, confirmation…) -->
   <div class="modal" id="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="dialog-title" hidden>
     <div class="modal-box modal-small">
@@ -391,8 +399,10 @@ Utilisez l’outil Ping (P) puis cliquez sur deux terminaux.
   <script src="pannes.js"></script>
   <script src="tutorials.js"></script>
   <script src="labs.js"></script>
+  <script src="docs.js"></script>
   <script src="exercises.js"></script>
   <script src="exam.js"></script>
+  
   <script src="app.js"></script>
 </body>
 </html>

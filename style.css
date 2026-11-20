@@ -49,6 +49,97 @@
   --left-w: 250px;
   --right-w: 380px;
   --console-h: 190px;
+  /* Couleurs de texte d'état et habillage (redéfinies par le thème clair) */
+  --t-ok: #86efac;
+  --t-warn: #fcd34d;
+  --t-err: #fca5a5;
+  --t-info: #93c5fd;
+  --t-amber: #fde68a;
+  --t-err-soft: #fecaca;
+  --t-info-soft: #bfdbfe;
+  --t-violet: #e9d5ff;
+  --t-pink: #fbcfe8;
+  --topbar-1: #121c33;
+  --topbar-2: #0e1628;
+  --overlay: rgba(10, 15, 28, 0.82);
+  --overlay-2: rgba(10, 15, 28, 0.6);
+  --coach-bg: rgba(17, 26, 46, 0.97);
+  --formula-bg: #0b1222;
+  --statusbar-bg: #0b1222;
+  --star: #fff;
+  /* Canevas : ciel (segment spatial), sol (segment terrestre), pluie */
+  --sky-0: #02040b;
+  --sky-1: #0a1033;
+  --sky-2: #16245a;
+  --ground-0: #10203a;
+  --ground-1: #0c1626;
+  --ground-2: #0a1320;
+  --rain-stroke: #93c5fd;
+}
+
+/* ------------------------------------------------------------------
+ * THÈME CLAIR (bouton ◐ de la barre supérieure, mémorisé sur le poste)
+ * ------------------------------------------------------------------ */
+:root[data-theme='light'] {
+  --bg: #f4f6fb;
+  --bg-2: #eef2f8;
+  --panel: #ffffff;
+  --panel-2: #f1f5f9;
+  --panel-3: #e2e8f0;
+  --border: #d5dde9;
+  --border-2: #b9c6d8;
+  --text: #0f172a;
+  --text-2: #334155;
+  --muted: #64748b;
+  --accent: #0891b2;
+  --accent-2: #0e7490;
+  --accent-ink: #ffffff;
+  --violet: #7c3aed;
+  --ok: #16a34a;
+  --warn: #d97706;
+  --err: #dc2626;
+  --info: #2563eb;
+  --fh: #0891b2;
+  --blr: #059669;
+  --vsat: #7c3aed;
+  --ip: #db2777;
+  --site: #b45309;
+  --wire: #64748b;
+  --fiber: #ea580c;
+  --space-1: #dbeafe;
+  --space-2: #eff6ff;
+  --earth-1: #f8fafc;
+  --earth-2: #f1f5f9;
+  --grid: rgba(30, 64, 120, 0.08);
+  --grid-major: rgba(30, 64, 120, 0.16);
+  --shadow: 0 10px 30px rgba(15, 23, 42, 0.18);
+  --t-ok: #15803d;
+  --t-warn: #a16207;
+  --t-err: #b91c1c;
+  --t-info: #1d4ed8;
+  --t-amber: #92400e;
+  --t-err-soft: #991b1b;
+  --t-info-soft: #1e40af;
+  --t-violet: #6d28d9;
+  --t-pink: #9d174d;
+  --topbar-1: #ffffff;
+  --topbar-2: #eef2f8;
+  --overlay: rgba(255, 255, 255, 0.9);
+  --overlay-2: rgba(255, 255, 255, 0.75);
+  --coach-bg: rgba(255, 255, 255, 0.97);
+  --formula-bg: #f5f3ff;
+  --statusbar-bg: #e8edf5;
+  --star: transparent;
+  --sky-0: #bfdbfe;
+  --sky-1: #dbeafe;
+  --sky-2: #eff6ff;
+  --ground-0: #e2e8f0;
+  --ground-1: #f1f5f9;
+  --ground-2: #f8fafc;
+  --rain-stroke: #2563eb;
+}
+:root[data-theme='light'] .brand h1 {
+  color: var(--text);
 }
 
 /* ------------------------------------------------------------------
@@ -176,7 +267,7 @@ a {
 .btn-danger {
   background: rgba(239, 68, 68, 0.15);
   border-color: rgba(239, 68, 68, 0.5);
-  color: #fca5a5;
+  color: var(--t-err);
 }
 .btn-danger:hover {
   background: rgba(239, 68, 68, 0.28);
@@ -257,7 +348,7 @@ input[type='range'] {
   align-items: center;
   gap: 14px;
   padding: 0 14px;
-  background: linear-gradient(180deg, #121c33, #0e1628);
+  background: linear-gradient(180deg, var(--topbar-1), var(--topbar-2));
   border-bottom: 1px solid var(--border);
   position: relative;
   z-index: 20;
@@ -323,11 +414,11 @@ input[type='range'] {
 }
 .mode-btn.active[data-mode='weather'] {
   background: rgba(96, 165, 250, 0.18);
-  color: #93c5fd;
+  color: var(--t-info);
 }
 .mode-btn.active[data-mode='diag'] {
   background: rgba(239, 68, 68, 0.16);
-  color: #fca5a5;
+  color: var(--t-err);
 }
 
 /* Curseur de pluie */
@@ -339,7 +430,7 @@ input[type='range'] {
   height: 36px;
 }
 .rain-icon {
-  color: #93c5fd;
+  color: var(--t-info);
 }
 .rain-label {
   font-size: 12px;
@@ -627,7 +718,7 @@ input[type='range'] {
 .tool[data-tool='cut'].active {
   background: rgba(239, 68, 68, 0.15);
   border-color: rgba(239, 68, 68, 0.5);
-  color: #fca5a5;
+  color: var(--t-err);
 }
 body:not([data-mode='diag']) .diag-only {
   display: none;
@@ -693,7 +784,7 @@ body:not([data-mode='diag']) .diag-only {
   flex-wrap: wrap;
   gap: 4px 12px;
   padding: 6px 10px;
-  background: rgba(10, 15, 28, 0.82);
+  background: var(--overlay);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   font-size: 11px;
@@ -738,7 +829,7 @@ body:not([data-mode='diag']) .diag-only {
   color: var(--muted);
   border: 1px dashed var(--border-2);
   border-radius: var(--radius);
-  background: rgba(10, 15, 28, 0.6);
+  background: var(--overlay-2);
   pointer-events: none;
   font-size: 13px;
   text-align: center;
@@ -823,7 +914,7 @@ body:not([data-mode='diag']) .diag-only {
   font-family: var(--mono);
 }
 .star {
-  fill: #fff;
+  fill: var(--star);
 }
 .grid-minor {
   stroke: var(--grid);
@@ -1027,13 +1118,13 @@ body:not([data-mode='diag']) .diag-only {
   pointer-events: none;
 }
 .link-label.st-optimal {
-  fill: #86efac;
+  fill: var(--t-ok);
 }
 .link-label.st-degraded {
-  fill: #fcd34d;
+  fill: var(--t-warn);
 }
 .link-label.st-down {
-  fill: #fca5a5;
+  fill: var(--t-err);
 }
 .cut-mark {
   stroke: var(--err);
@@ -1200,16 +1291,16 @@ body.anim-off .beam {
   flex: none;
 }
 .log-list .ok {
-  color: #86efac;
+  color: var(--t-ok);
 }
 .log-list .warn {
-  color: #fcd34d;
+  color: var(--t-warn);
 }
 .log-list .error {
-  color: #fca5a5;
+  color: var(--t-err);
 }
 .log-list .info {
-  color: #93c5fd;
+  color: var(--t-info);
 }
 .terminal {
   margin: 0;
@@ -1225,7 +1316,7 @@ body.anim-off .beam {
   color: var(--accent);
 }
 .terminal .t-err {
-  color: #fca5a5;
+  color: var(--t-err);
 }
 
 /* ------------------------------------------------------------------
@@ -1407,19 +1498,19 @@ body.anim-off .beam {
 }
 .status-pill.optimal,
 .status-pill.ok {
-  color: #86efac;
+  color: var(--t-ok);
   background: rgba(34, 197, 94, 0.13);
 }
 .status-pill.degraded,
 .status-pill.warn,
 .status-pill.congested {
-  color: #fcd34d;
+  color: var(--t-warn);
   background: rgba(245, 158, 11, 0.13);
 }
 .status-pill.down,
 .status-pill.err,
 .status-pill.storm {
-  color: #fca5a5;
+  color: var(--t-err);
   background: rgba(239, 68, 68, 0.13);
 }
 
@@ -1456,7 +1547,7 @@ body.anim-off .beam {
 .calc-step .cs-formula {
   font-family: var(--mono);
   font-size: 11px;
-  color: #c4b5fd;
+  color: var(--t-violet);
   margin-top: 3px;
 }
 .calc-step .cs-subst {
@@ -1468,7 +1559,7 @@ body.anim-off .beam {
 }
 .calc-step .cs-note {
   font-size: 11px;
-  color: #fcd34d;
+  color: var(--t-warn);
   margin-top: 3px;
 }
 .calc-group-title {
@@ -1916,13 +2007,13 @@ body.anim-off .beam {
 .formula {
   font-family: var(--mono);
   font-size: 14px;
-  background: #0b1222;
+  background: var(--formula-bg);
   border: 1px solid var(--border-2);
   border-left: 3px solid var(--violet);
   border-radius: var(--radius-sm);
   padding: 10px 14px;
   margin: 8px 0 12px;
-  color: #e9d5ff;
+  color: var(--t-violet);
   overflow-x: auto;
 }
 .note,
@@ -1972,7 +2063,7 @@ body.anim-off .beam {
   max-height: 60vh;
   display: flex;
   flex-direction: column;
-  background: rgba(17, 26, 46, 0.97);
+  background: var(--coach-bg);
   border: 1px solid rgba(34, 211, 238, 0.45);
   border-radius: 10px;
   box-shadow: var(--shadow);
@@ -2039,11 +2130,11 @@ body.anim-off .beam {
   font-size: 12px;
 }
 .coach-body .check.ok {
-  color: #86efac;
+  color: var(--t-ok);
   background: rgba(34, 197, 94, 0.1);
 }
 .coach-body .check.ko {
-  color: #fcd34d;
+  color: var(--t-warn);
 }
 .coach-foot {
   display: flex;
@@ -2064,7 +2155,7 @@ body.anim-off .beam {
   align-items: center;
   gap: 18px;
   padding: 0 12px;
-  background: #0b1222;
+  background: var(--statusbar-bg);
   border-top: 1px solid var(--border);
   font-size: 11.5px;
   color: var(--muted);
@@ -2074,19 +2165,19 @@ body.anim-off .beam {
   flex: 1;
 }
 #st-health.ok {
-  color: #86efac;
+  color: var(--t-ok);
 }
 #st-health.warn {
-  color: #fcd34d;
+  color: var(--t-warn);
 }
 #st-health.error {
-  color: #fca5a5;
+  color: var(--t-err);
 }
 
 /* ------------------------------------------------------------------
  * 13. ADAPTATION AUX ÉCRANS PLUS PETITS
  * ------------------------------------------------------------------ */
-@media (max-width: 1800px) {
+@media (max-width: 2050px) {
   .brand-sub,
   .rain-desc {
     display: none;
@@ -2208,7 +2299,7 @@ body:not([data-mode='weather']) .weather-only {
 #btn-storm.running {
   background: rgba(239, 68, 68, 0.18);
   border-color: rgba(239, 68, 68, 0.5);
-  color: #fca5a5;
+  color: var(--t-err);
 }
 .dir-switch {
   display: inline-flex;
@@ -2245,17 +2336,17 @@ body:not([data-mode='weather']) .weather-only {
   font-size: 12px;
   background: rgba(245, 158, 11, 0.09);
   border: 1px solid rgba(245, 158, 11, 0.35);
-  color: #fde68a;
+  color: var(--t-amber);
 }
 .issue-list li.error {
   background: rgba(239, 68, 68, 0.09);
   border-color: rgba(239, 68, 68, 0.4);
-  color: #fecaca;
+  color: var(--t-err-soft);
 }
 .issue-list li.info {
   background: rgba(96, 165, 250, 0.08);
   border-color: rgba(96, 165, 250, 0.35);
-  color: #bfdbfe;
+  color: var(--t-info-soft);
 }
 .ring-card,
 .flow-card {
@@ -2316,17 +2407,17 @@ body:not([data-mode='weather']) .weather-only {
 .hdr-stack span.h-vlan {
   background: rgba(52, 211, 153, 0.15);
   border-color: rgba(52, 211, 153, 0.45);
-  color: #a7f3d0;
+  color: var(--t-ok);
 }
 .hdr-stack span.h-mpls {
   background: rgba(244, 114, 182, 0.15);
   border-color: rgba(244, 114, 182, 0.45);
-  color: #fbcfe8;
+  color: var(--t-pink);
 }
 .hdr-stack span.h-ip {
   background: rgba(96, 165, 250, 0.13);
   border-color: rgba(96, 165, 250, 0.4);
-  color: #bfdbfe;
+  color: var(--t-info-soft);
 }
 .hdr-seg {
   font-size: 11px;
@@ -2369,17 +2460,17 @@ body:not([data-mode='weather']) .weather-only {
 .verdict.ok {
   background: rgba(34, 197, 94, 0.09);
   border-color: rgba(34, 197, 94, 0.4);
-  color: #bbf7d0;
+  color: var(--t-ok);
 }
 .verdict.warn {
   background: rgba(245, 158, 11, 0.09);
   border-color: rgba(245, 158, 11, 0.4);
-  color: #fde68a;
+  color: var(--t-amber);
 }
 .verdict.err {
   background: rgba(239, 68, 68, 0.09);
   border-color: rgba(239, 68, 68, 0.4);
-  color: #fecaca;
+  color: var(--t-err-soft);
 }
 .coach-head.dragging {
   cursor: grabbing;
@@ -2451,7 +2542,7 @@ body:not([data-mode='weather']) .weather-only {
   opacity: 0.7;
 }
 .height-handle .hh-text {
-  fill: #fde68a;
+  fill: var(--t-amber);
   font-size: 10px;
   font-weight: 700;
   font-family: var(--mono);
@@ -2484,7 +2575,7 @@ body:not([data-mode='weather']) .weather-only {
 }
 .answer-title {
   font-weight: 700;
-  color: #86efac;
+  color: var(--t-ok);
   margin-bottom: 4px;
 }
 .answer p {
@@ -2516,12 +2607,12 @@ body:not([data-mode='weather']) .weather-only {
   border-radius: var(--radius-sm);
   background: rgba(245, 158, 11, 0.1);
   border: 1px solid rgba(245, 158, 11, 0.45);
-  color: #fde68a;
+  color: var(--t-amber);
   font-size: 12.5px;
 }
 .btn-teacher-on {
   border-color: rgba(34, 197, 94, 0.6);
-  color: #86efac;
+  color: var(--t-ok);
 }
 @media print {
   .answer {
@@ -2886,7 +2977,7 @@ body:not([data-mode='weather']) .weather-only {
   font-family: var(--mono);
   font-weight: 700;
   font-size: 14px;
-  color: #fecaca;
+  color: var(--t-err-soft);
 }
 .act-count.exam-live {
   background: var(--err);
@@ -3169,4 +3260,226 @@ body.topo-locked .palette,
 body.topo-locked .pal-group {
   opacity: 0.45;
   pointer-events: none;
+}
+
+/* Documentation : sommaire par rubriques et recherche */
+.docs-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.docs-nav .search {
+  width: 100%;
+  padding: 7px 9px;
+  flex: 0 0 auto;
+}
+.docs-nav .nav-item {
+  padding: 6px 10px;
+  margin-bottom: 2px;
+}
+.nav-group {
+  margin: 12px 4px 4px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.nav-group:first-child {
+  margin-top: 0;
+}
+.doc-group {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 11px;
+}
+.doc kbd {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  padding: 1px 6px;
+  border: 1px solid var(--border-2);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: var(--bg-2);
+}
+.doc a[data-doc] {
+  color: var(--accent);
+}
+
+/* Examen : consignes, alertes de correction, barème modifiable */
+.exam-consignes {
+  border: 1px solid var(--border-2);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-sm);
+  background: var(--bg-2);
+  padding: 8px 12px;
+  margin: 8px 0;
+  font-size: 13px;
+}
+.exam-consignes > div {
+  margin-top: 4px;
+  white-space: normal;
+}
+#exam-banner .btn {
+  margin-left: 4px;
+}
+.gr-alert {
+  color: #f59e0b;
+  font-size: 11px;
+  font-weight: 700;
+}
+.gr-bareme {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-top: 6px;
+  font-size: 12px;
+}
+.gr-bareme input {
+  width: 60px;
+}
+#cr-consignes,
+#iv-list {
+  width: 100%;
+  font-family: inherit;
+}
+/* Examen : le bandeau occupe une seconde ligne de la barre supérieure (rien ne déborde) */
+body.exam-mode {
+  --topbar-h: 98px;
+}
+body.exam-mode .topbar {
+  flex-wrap: wrap;
+  align-content: center;
+  row-gap: 6px;
+}
+body.exam-mode #exam-banner {
+  order: 99;
+  flex: 1 0 100%;
+  justify-content: center;
+}
+/* Barre supérieure : libellés courts sur les écrans de 1280 à 1660 px */
+.lbl-short {
+  display: none;
+}
+@media (max-width: 1660px) {
+  #btn-labs .lbl-long,
+  #btn-exam .lbl-long {
+    display: none;
+  }
+  #btn-labs .lbl-short {
+    display: inline;
+  }
+  #rain-slider {
+    width: 80px;
+  }
+}
+@media (max-width: 1320px) {
+  .brand-text {
+    display: none;
+  }
+}
+
+/* Dossier technique (version enseignant) */
+.modal-medium {
+  max-width: 780px;
+  max-height: calc(100vh - 40px);
+  display: flex;
+  flex-direction: column;
+}
+.ds-sections {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px 16px;
+  margin: 6px 0 12px;
+  font-size: 13px;
+}
+#ds-notes {
+  width: 100%;
+  font-family: inherit;
+}
+@media (max-width: 1780px) {
+  #btn-dossier .lbl-long,
+  #btn-exam .lbl-long,
+  #btn-labs .lbl-long {
+    display: none;
+  }
+  #btn-labs .lbl-short {
+    display: inline;
+  }
+}
+@media (max-width: 1320px) {
+  .rain-label {
+    display: none;
+  }
+  #rain-slider {
+    width: 70px;
+  }
+}
+
+/* Fiche de recette (onglet Bilan, sans sélection) */
+.recette {
+  margin-top: 12px;
+  text-align: left;
+}
+.recette-table td {
+  vertical-align: top;
+}
+.recette-table .rec-in {
+  width: 74px;
+}
+.recette-table .st-ok {
+  color: var(--ok, #22c55e);
+}
+.recette-table .st-weak {
+  color: #f59e0b;
+}
+.recette-table .st-los {
+  color: #ef4444;
+}
+.recette-ens {
+  border: 1px dashed #f59e0b;
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin: 10px 0;
+}
+
+/* Panneaux redimensionnables : poignées sur les bords intérieurs (double-clic : taille par défaut) */
+.toolbox,
+.inspector,
+.console {
+  position: relative;
+}
+.resizer {
+  position: absolute;
+  z-index: 6;
+  background: transparent;
+  transition: background 0.15s;
+}
+.resizer:hover,
+.resizer.dragging {
+  background: rgba(34, 211, 238, 0.35);
+}
+.resizer[data-resize='left'] {
+  top: 0;
+  right: -3px;
+  width: 6px;
+  height: 100%;
+  cursor: col-resize;
+}
+.resizer[data-resize='right'] {
+  top: 0;
+  left: -3px;
+  width: 6px;
+  height: 100%;
+  cursor: col-resize;
+}
+.resizer[data-resize='console'] {
+  left: 0;
+  top: -3px;
+  height: 6px;
+  width: 100%;
+  cursor: row-resize;
+}
+body.resizing {
+  user-select: none;
 }

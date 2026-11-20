@@ -971,29 +971,32 @@
       }
 
       // 6. RSL (une panne cachée ajoute une perte non affichée : seul l'écart mesure / calcul est visible)
-      const hidden = Math.max(0, p.hiddenLossDb || 0);
+      // hidden > 0 : perte d'une panne cachée ; < 0 possible en recette réaliste (réseau réel meilleur que le calcul)
+      const hidden = Number.isFinite(p.hiddenLossDb) ? p.hiddenLossDb : 0;
       const pathLossClear = fsl + gas + diff + pointing + extra;
       const rslCalcClear = eirp - pathLossClear + p.gRxDbi - lossRx;
       const rslClear = rslCalcClear - hidden;
       const rsl = rslClear - rain.total;
       steps.push(
         Util.step(
-          hidden > 0.3 ? 'Niveau de réception RSL calculé' : 'Niveau de réception RSL',
+          Math.abs(hidden) > 0.3 ? 'Niveau de réception RSL calculé' : 'Niveau de réception RSL',
           'RSL = PIRE − FSL − A_gaz − A_pluie − A_autres + Grx − Lbranch,rx',
           `RSL = ${f2(eirp)} − ${f2(fsl)} − ${f2(gas)} − ${f2(rain.total)} − ${f2(diff + pointing + extra)} + ${f2(p.gRxDbi)} − ${f1(lossRx)}`,
           rsl + hidden,
           'dBm'
         )
       );
-      if (hidden > 0.3) {
+      if (Math.abs(hidden) > 0.3) {
         steps.push(
           Util.step(
             'RSL mesuré sur l’équipement de réception',
             'lecture de l’AGC / de l’interface de supervision',
-            `écart avec le calcul : ${f1(hidden)} dB`,
+            `écart avec le calcul : ${hidden > 0 ? '−' : '+'}${f1(Math.abs(hidden))} dB`,
             rsl,
             'dBm',
-            'Le niveau mesuré est inférieur au calcul : une anomalie est à localiser (équipement, branchement, câblage, pointage…).'
+            hidden > 3
+              ? 'Le niveau mesuré est inférieur au calcul : une anomalie est à localiser (équipement, branchement, câblage, pointage…).'
+              : 'Valeur réelle lue sur l’équipement : à comparer au calcul dans la fiche de recette.'
           )
         );
       }

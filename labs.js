@@ -3,9 +3,11 @@
  * MicroWave, BLR & VSAT Lab
  *
  * Contenu :
- *   - MBV.Labs.list : 6 TP prêts à l'emploi (topologie + consignes pas à pas
- *                     + vérification automatique des objectifs)
- *   - MBV.Course    : cours « FH, BLR, VSAT & Microwave IP »
+ *   - MBV.Labs.list : TP prêts à l'emploi (topologie + consignes pas à pas
+ *                     + vérification automatique des objectifs ; topologie de
+ *                     correction `solution`, version enseignant)
+ *   - MBV.Labs.examples : exemples prêts à explorer (sans étapes)
+ *   - MBV.Course    : cours « FH, BLR, VSAT & Microwave IP » (assemblé avec le guide par docs.js)
  *
  * Les topologies référencent les équipements par leur NOM (liens, flux,
  * fixation sur site). Les vérifications utilisent l'API MBV.App (app.js).
@@ -32,6 +34,24 @@
     links.push(Lk('ANT-' + suffix, 'ODU-' + suffix), Lk('ODU-' + suffix, 'IDU-' + suffix));
   }
 
+  /**
+   * Modifie une topologie construite : réglages d'équipements { nom: props }, réglages de liens
+   * [[a, b, props]] et liens ajoutés [[a, b]]. Lève une erreur si un nom est introuvable.
+   */
+  function fix(t, nodes, links, add) {
+    for (const [name, props] of Object.entries(nodes || {})) {
+      const n = t.nodes.find((x) => x.name === name);
+      if (!n) throw new Error('équipement introuvable : ' + name);
+      Object.assign(n.props, props);
+    }
+    for (const [a, b, props] of links || []) {
+      const l = t.links.find((x) => (x.a === a && x.b === b) || (x.a === b && x.b === a));
+      if (!l) throw new Error('lien introuvable : ' + a + ' — ' + b);
+      l.props = Object.assign(l.props || {}, props);
+    }
+    for (const [a, b] of add || []) t.links.push(Lk(a, b));
+    return t;
+  }
   /* --- Petites fonctions de vérification --- */
   const st = (api, a, b) => {
     const l = api.link(a, b);
@@ -50,6 +70,7 @@
   /* =================== TP 1 =================== */
   LABS.push({
     id: 'tp1',
+    
     num: 'TP 1',
     title: 'Dimensionnement d’un Faisceau Hertzien point-à-point (25 km)',
     subtitle: 'Bande 7 GHz vs 18 GHz, diamètre des paraboles, marge > 25 dB',
@@ -142,6 +163,7 @@
   /* =================== TP 2 =================== */
   LABS.push({
     id: 'tp2',
+    
     num: 'TP 2',
     title: 'Dégagement de la zone de Fresnel et hauteur de pylône',
     subtitle: 'Une colline obstrue le faisceau : profil topographique et surélévation',
@@ -335,6 +357,7 @@
   /* =================== TP 4 =================== */
   LABS.push({
     id: 'tp4',
+    
     num: 'TP 4',
     title: 'Boucle Locale Radio urbaine avec VLAN',
     subtitle: 'Raccorder 3 entreprises à une BTS 3,5 GHz et isoler leur trafic (VLAN 100/200/300)',
@@ -458,6 +481,7 @@
   /* =================== TP 5 =================== */
   LABS.push({
     id: 'tp5',
+    
     num: 'TP 5',
     title: 'Liaison VSAT d’un site minier isolé (GEO vs LEO)',
     subtitle: 'Pointage, Eb/N0, latence ~550 ms, orage en Ka vs C, bascule LEO',
@@ -716,6 +740,7 @@
   /* =================== TP 7 =================== */
   LABS.push({
     id: 'tp7',
+    
     num: 'TP 7',
     title: 'Faisceau E-Band 80 GHz en ville, secours 23 GHz',
     subtitle: 'Très haut débit sur 2 km, canaux larges, effondrement sous l’orage, bascule multibande',
@@ -827,6 +852,7 @@
   /* =================== TP 8 =================== */
   LABS.push({
     id: 'tp8',
+    
     num: 'TP 8',
     title: 'Protection 1+1 HSB d’un faisceau critique',
     subtitle: 'Pannes d’ODU, d’IDU et d’antenne : 1+0 contre 1+1, disponibilité',
@@ -930,6 +956,7 @@
   /* =================== TP 9 =================== */
   LABS.push({
     id: 'tp9',
+    
     num: 'TP 9',
     title: 'Anneau Ethernet hertzien protégé par ERPS (G.8032)',
     subtitle: 'Tempête de broadcast, lien RPL, bascule < 50 ms, retour automatique',
@@ -1048,6 +1075,7 @@
   /* =================== TP 10 =================== */
   LABS.push({
     id: 'tp10',
+    
     num: 'TP 10',
     title: 'Backhaul hybride : désenclaver un village par satellite et BLR',
     subtitle: 'VSAT vers le téléport, distribution locale en BLR, goulot d’étranglement, QoS',
@@ -1181,6 +1209,7 @@
   /* =================== TP 11 =================== */
   LABS.push({
     id: 'tp11',
+    
     num: 'TP 11',
     title: 'BLR : 5,8 GHz ou 26 GHz ? CPE intérieur ou extérieur ?',
     subtitle: 'Portée contre débit, pertes de mur, pluie en ondes millimétriques',
@@ -1380,6 +1409,7 @@
   /* =================== TP 12 =================== */
   LABS.push({
     id: 'tp12',
+    
     num: 'TP 12',
     title: '« Panne mystère » : remettre en service un réseau défaillant',
     subtitle: 'TP d’évaluation : 5 défauts cachés à trouver, expliquer et corriger',
@@ -1583,6 +1613,7 @@
   };
   LABS.push({
     id: 'tp14',
+    
     num: 'TP 14',
     title: 'Disponibilité d’un bond long et diversité d’espace',
     subtitle: 'Bond de 50 km à 6 GHz, trajets multiples (UIT-R P.530), objectif 99,99 %, configuration 1+1 SD',
@@ -1694,6 +1725,7 @@
   const nodeHalves15 = (api) => hops15(api).map((h) => (h.s && h.s.freq ? h.s.freq[h.s.ends.A.node.name === h.a ? 'A' : 'B'].half : null));
   LABS.push({
     id: 'tp15',
+    
     num: 'TP 15',
     title: 'Plan de fréquences d’un nœud hertzien et interférences',
     subtitle: 'Nœud à 3 directions en 15 GHz : règle haut / bas, canaux, polarisation, réutilisation, C/I',
@@ -1881,7 +1913,92 @@
     },
   });
 
-  MBV.Labs = { list: LABS };
+  /* ------------------------------------------------------------------
+   * 3. BIBLIOTHÈQUE D'EXEMPLES (réseaux prêts à explorer, sans étapes)
+   * ------------------------------------------------------------------ */
+  /** Backhaul FH d'un site 4G : deux bonds en cascade (7 GHz sur 30 km, 15 GHz sur 12 km). */
+  function exBackhaul() {
+    const nodes = [];
+    const links = [];
+    nodes.push(N('tower', 'Cœur Ouaga', 150, 560, { heightM: 50, groundM: 305 }), N('tower', 'Relais Est', 900, 560, { heightM: 60, groundM: 320 }), N('tower', 'Site 4G', 1200, 560, { heightM: 35, groundM: 310 }));
+    fhSite(nodes, links, 'Cœur Ouaga', 'C', 150, 560, 'left', { band: '7', txPowerDbm: 27, channelMHz: 28 }, { diameterM: 1.2, polarization: 'V', heightM: 48 }, { maxMod: '256QAM' });
+    fhSite(nodes, links, 'Relais Est', 'R1', 900, 560, 'right', { band: '7', txPowerDbm: 27, channelMHz: 28 }, { diameterM: 1.2, polarization: 'V', heightM: 58 }, { maxMod: '256QAM' });
+    fhSite(nodes, links, 'Relais Est', 'R2', 900, 560, 'left', { band: '15', txPowerDbm: 22, channelMHz: 28 }, { diameterM: 0.6, polarization: 'V', heightM: 55 }, { maxMod: '256QAM' });
+    fhSite(nodes, links, 'Site 4G', 'S', 1200, 560, 'right', { band: '15', txPowerDbm: 22, channelMHz: 28 }, { diameterM: 0.6, polarization: 'V', heightM: 33 }, { maxMod: '256QAM' });
+    nodes.push(N('server', 'Cœur réseau', 60, 720, { ip: '10.0.0.1' }), N('switch', 'SW-Relais', 900, 720, { vlans: 'all' }), N('gnodeb', 'gNodeB 4G', 1270, 720, { ip: '10.0.0.30' }));
+    links.push(Lk('ANT-C', 'ANT-R1', { name: 'FH Cœur ↔ Relais (7 GHz)' }), Lk('ANT-R2', 'ANT-S', { name: 'FH Relais ↔ Site 4G (15 GHz)' }), Lk('IDU-C', 'Cœur réseau'), Lk('IDU-R1', 'SW-Relais'), Lk('IDU-R2', 'SW-Relais'), Lk('IDU-S', 'gNodeB 4G'));
+    return { settings: { title: 'Exemple — Backhaul FH d’un site 4G', scaleKm: 2, rainMmH: 0 }, nodes, links, flows: [Fl('gNodeB 4G', 'Cœur réseau', 120, 'data', 'Données 4G'), Fl('gNodeB 4G', 'Cœur réseau', 10, 'voice', 'Voix sur IP')] };
+  }
+  /** Recette réaliste du backhaul : écarts de terrain + un branchement humide caché sur le bond 15 GHz. */
+  function exRecette() {
+    const t = exBackhaul();
+    t.settings = Object.assign(t.settings, { title: 'Exemple — Recette du backhaul (mesures réalistes)', recette: { actif: true, seed: 20261120, tol: 3, mesures: {} } });
+    const odu = t.nodes.find((n) => n.name === 'ODU-S');
+    odu.props.fault = { type: 'branchement-humide', kind: 'hw', hidden: true, restore: {}, meta: { lossDb: 19 } };
+    return t;
+  }
+  /** Réseau VSAT en étoile : un téléport et trois stations distantes (banque, école, mine). */
+  function exVsatEtoile() {
+    const nodes = [
+      N('satellite', 'GEO 7°E', 640, 60, { orbit: 'GEO', band: 'Ku', lonDeg: 7, elevationDeg: 60 }),
+      N('hub', 'Téléport Ouaga', 160, 560, { coordMode: 'manual', lat: 12.37, lon: -1.53, dishM: 7.3, hpaW: 200, lnbNfDb: 0.6 }),
+      N('router', 'Routeur cœur', 80, 700, { loopback: '10.255.0.1' }),
+      N('internet', 'Internet', 80, 840, { ip: '10.10.0.1', prefix: 24 }),
+    ];
+    const links = [Lk('Téléport Ouaga', 'Routeur cœur', { capacityMbps: 10000 }, 'fiber'), Lk('Routeur cœur', 'Internet', { capacityMbps: 10000 }, 'fiber'), Lk('GEO 7°E', 'Téléport Ouaga')];
+    const flows = [];
+    const sites = [
+      ['Banque Dori', 14.03, -0.03, 1.2, 2, 'bankAgency', '10.30.0.10'],
+      ['École Fada', 12.06, 0.36, 0.96, 2, 'pc', '10.31.0.10'],
+      ['Mine Essakane', 14.38, -0.1, 1.8, 4, 'ruralSite', '10.32.0.10'],
+    ];
+    sites.forEach(([nm, lat, lon, dish, w, type, ip], i) => {
+      const x = 520 + i * 330;
+      const s = nm.split(' ')[1];
+      nodes.push(
+        N('vsatAntenna', 'VSAT ' + s, x, 520, { coordMode: 'manual', lat, lon, dishM: dish, autoPoint: true }),
+        N('buc', 'BUC ' + s, x - 60, 620, { powerW: w }),
+        N('lnb', 'LNB ' + s, x + 60, 620, { nfDb: 0.8 }),
+        N('vsatModem', 'Modem ' + s, x, 720, { retSymbolRate: 1, retMaxModcod: '8PSK 3/4' }),
+        N(type, nm, x + 90, 830, { ip, prefix: 24, gateway: ip.replace(/\.10$/, '.1') })
+      );
+      links.push(Lk('GEO 7°E', 'VSAT ' + s), Lk('VSAT ' + s, 'BUC ' + s), Lk('VSAT ' + s, 'LNB ' + s), Lk('BUC ' + s, 'Modem ' + s), Lk('LNB ' + s, 'Modem ' + s), Lk('Modem ' + s, nm));
+      flows.push(Fl(nm, 'Internet', 1, 'data', nm + ' → Internet'));
+    });
+    return { settings: { title: 'Exemple — Réseau VSAT en étoile', scaleKm: 2, rainMmH: 0 }, nodes, links, flows };
+  }
+  /** Boucle locale radio 5,8 GHz d'un fournisseur d'accès : trois secteurs de 120°, six abonnés. */
+  function exWisp() {
+    const c = { x: 700, y: 560 };
+    const nodes = [N('tower', 'Pylône WISP', c.x, c.y, { heightM: 45, groundM: 300 }), N('switch', 'SW-WISP', c.x - 220, c.y + 180, { vlans: 'all' }), N('router', 'Routeur WISP', c.x - 380, c.y + 180, { loopback: '10.255.0.5', interVlan: true }), N('internet', 'Internet', c.x - 520, c.y + 300, { ip: '10.10.0.1', prefix: 24 })];
+    const links = [Lk('SW-WISP', 'Routeur WISP', { capacityMbps: 1000 }, 'fiber'), Lk('Routeur WISP', 'Internet', { capacityMbps: 10000 }, 'fiber')];
+    const flows = [];
+    [0, 120, 240].forEach((az, i) => {
+      const bts = 'Secteur ' + (i + 1);
+      nodes.push(N('blrBts', bts, c.x + 40 * Math.sin((az * Math.PI) / 180), c.y - 40 * Math.cos((az * Math.PI) / 180), { siteId: 'Pylône WISP', band: '5.8', channelMHz: 40, txPowerDbm: 24, sectorDeg: 120, azimuthDeg: az, heightM: 43, maxMod: '256QAM 5/6' }));
+      links.push(Lk(bts, 'SW-WISP', { capacityMbps: 1000 }, 'fiber'));
+      [-25, 25].forEach((da, k) => {
+        const a = ((az + da) * Math.PI) / 180;
+        const r = 160 + 90 * k + 40 * i;
+        const nm = `Abonné ${i * 2 + k + 1}`;
+        const x = c.x + r * Math.sin(a);
+        const y = c.y - r * Math.cos(a) * 0.55;
+        nodes.push(N('blrCpe', 'CPE ' + nm, x, y, { install: 'outdoor', heightM: 8 }), N('pc', nm, x + 50, y + 60, { ip: `10.40.${i}.${10 + k}`, prefix: 16, gateway: '10.40.0.1' }));
+        links.push(Lk(bts, 'CPE ' + nm), Lk('CPE ' + nm, nm));
+        flows.push(Fl(nm, 'Internet', 4, 'data', nm + ' → Internet'));
+      });
+    });
+    return { settings: { title: 'Exemple — BLR 5,8 GHz à trois secteurs', scaleKm: 0.5, rainMmH: 0 }, nodes, links, flows };
+  }
+  const EXAMPLES = [
+    { id: 'ex-backhaul', num: 'Ex 1', title: 'Backhaul FH d’un site 4G', subtitle: 'Deux bonds en cascade : 7 GHz sur 30 km, 15 GHz sur 12 km', tags: ['fh'], mode: 'design', desc: '<p>Un site 4G est raccordé au cœur de réseau par deux bonds : un long bond <b>7 GHz</b> (paraboles 1,2 m) jusqu’au relais, puis un bond court <b>15 GHz</b> (0,6 m). Comparez les deux bilans, faites pleuvoir : lequel se dégrade le premier ? Pourquoi a-t-on choisi deux bandes différentes ?</p>', build: exBackhaul },
+    { id: 'ex-recette', num: 'Ex 2', title: 'Recette du backhaul (mesures réalistes)', subtitle: 'Fiche et rapport de recette ; une liaison n’est pas conforme', tags: ['fh'], mode: 'diag', desc: '<p>Le même réseau, en <b>recette réaliste</b> : chaque liaison réelle s’écarte un peu du calcul, comme sur le terrain. Relevez le RSL mesuré de chaque sens, remplissez la <b>fiche de recette</b> (onglet Bilan de liaison, sans sélection) et concluez. Une liaison est <b>non conforme</b> : trouvez la cause et intervenez (mode Dépannage), puis imprimez le rapport de recette.</p>', build: exRecette },
+    { id: 'ex-vsat', num: 'Ex 3', title: 'Réseau VSAT en étoile', subtitle: 'Un téléport, trois stations : banque, école, mine', tags: ['vsat'], mode: 'design', desc: '<p>Trois sites isolés reliés à Internet par satellite GEO en bande Ku. Les paraboles n’ont pas le même diamètre ni les BUC la même puissance : comparez PIRE, Eb/N0, MODCOD et débits. Que se passe-t-il pour chaque site en bande Ka sous un orage ?</p>', build: exVsatEtoile },
+    { id: 'ex-wisp', num: 'Ex 4', title: 'BLR 5,8 GHz à trois secteurs', subtitle: 'Fournisseur d’accès rural : 3 secteurs de 120°, 6 abonnés', tags: ['blr'], mode: 'design', desc: '<p>Un pylône porte trois stations de base sectorielles orientées à 0°, 120° et 240°. Observez l’écart de chaque CPE à l’axe de son secteur, le partage du débit entre abonnés et la portée. Déplacez un abonné hors de son secteur, ou loin du pylône.</p>', build: exWisp },
+    { id: 'ex-leo', num: 'Ex 5', title: 'Constellation LEO en défilement', subtitle: 'Handovers, Doppler et latence d’une orbite basse', tags: ['vsat'], mode: 'design', desc: '<p>La topologie du TP 13, sans consignes : lancez l’horloge de simulation (▶) et observez les passages des satellites, les handovers, le Doppler et la latence. Réduisez le nombre de satellites par plan pour faire apparaître des trous de couverture.</p>', build: () => LABS.find((l) => l.id === 'tp13').build() },
+  ];
+
+  MBV.Labs = { list: LABS, examples: EXAMPLES };
 
   /* ------------------------------------------------------------------
    * 3. COURS EMBARQUÉ
@@ -2254,29 +2371,6 @@
               <tr><td><b>RTT</b></td><td>Round Trip Time : temps aller-retour d’un paquet (ping).</td></tr>
               <tr><td><b>VLAN</b></td><td>Réseau local virtuel (IEEE 802.1Q).</td></tr>
               <tr><td><b>XPIC</b></td><td>Annuleur d’interférence de polarisation croisée.</td></tr></table>`,
-          },
-        ],
-      },
-      {
-        id: 'guide',
-        title: 'Utiliser le simulateur',
-        sections: [
-          {
-            id: 'prise-en-main',
-            title: 'Prise en main',
-            html: `<ol><li><b>Placer</b> : glissez un équipement de la boîte à outils sur le canevas. Déposé sur un <b>pylône</b> ou un <b>immeuble</b>, il s’y fixe. La hauteur d’un pylône est réglable de 15 à 150 m : <b>tirez la poignée</b> à son sommet sur le canevas, ou utilisez le curseur / la saisie dans ses Paramètres ou sous le profil de Fresnel ; les antennes fixées au sommet suivent.</li>
-              <li><b>Relier</b> : outil Lier (L), cliquez sur deux équipements. Le type de lien est déduit : faisceau entre deux antennes FH, liaison BLR entre BTS et CPE, liaison satellite vers le satellite, câble IF / coaxial / Ethernet sinon. Le menu « Lien : auto » permet de choisir la fibre.</li>
-              <li><b>Chaîne FH</b> : IDU — ODU — Antenne ~~~ Antenne — ODU — IDU (ou Full-Outdoor ~~~ Full-Outdoor).</li>
-              <li><b>Chaîne VSAT</b> : Modem — BUC + LNB — Antenne VSAT ~~~ Satellite ~~~ Hub — Routeur.</li>
-              <li><b>Analyser</b> : sélectionnez un lien ou un équipement ; l’inspecteur affiche les paramètres, le bilan pas à pas, le profil de Fresnel ou le pointage, et la vue réseau.</li>
-              <li><b>Trafic</b> : outil Flux (F) entre deux terminaux ; outil Ping (P) pour tester la connectivité.</li></ol>`,
-          },
-          {
-            id: 'modes',
-            title: 'Les trois modes',
-            html: `<ul><li><b>Conception RF/IP</b> : construction et configuration.</li><li><b>Météo &amp; Propagation</b> : pluie visible sur le plan, atténuations affichées, bouton « Simuler un orage ».</li><li><b>Diagnostic / Pannes</b> : outil Panne (C) pour couper un lien ou mettre un équipement en panne, réglage du dépointage des antennes.</li></ul>
-              <p>Couleurs des faisceaux : <span style="color:#22c55e">vert</span> = modulation maximale, <span style="color:#f59e0b">orange</span> = repli (pluie, dépointage…), <span style="color:#ef4444">rouge</span> = coupure.</p>
-              <p>Sauvegardez votre travail (bouton Sauvegarder ou Ctrl+S) : le fichier JSON peut être rouvert sur n’importe quel poste. Le bouton image exporte le schéma (SVG) pour le compte rendu.</p>`,
           },
         ],
       },

@@ -1,0 +1,153 @@
+<!doctype html>
+<!-- MicroWave, BLR & VSAT Lab — Livret de tutoriels imprimable -->
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Tutoriels — MicroWave, BLR &amp; VSAT Lab</title>
+<style>:root { --ink:#0f172a; --muted:#475569; --line:#cbd5e1; --soft:#f1f5f9; --brand:#0e7490; --prof:#7c3aed; --prof-soft:#f5f3ff; --warn:#b45309; --warn-soft:#fef3c7; }
+  * { box-sizing: border-box; } html, body { background:#e2e8f0; }
+  body { margin:0; font: 10.5pt/1.42 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; color:var(--ink); }
+  .toolbar { position:sticky; top:0; z-index:5; display:flex; flex-wrap:wrap; gap:12px; align-items:center; justify-content:center; padding:10px 16px; background:#0f172a; color:#fff; }
+  .toolbar button { font:inherit; font-weight:600; padding:6px 14px; border-radius:6px; border:0; background:#22d3ee; color:#082f49; cursor:pointer; }
+  .toolbar label { display:flex; gap:6px; align-items:center; cursor:pointer; }
+  .sheet { width:210mm; min-height:297mm; margin:12px auto; padding:15mm 16mm 18mm; background:#fff; box-shadow:0 2px 10px #0002; position:relative; }
+  @media (max-width: 820px) { .sheet { width:auto; min-height:0; margin:12px 16px; padding:20px 16px; } }
+  h1,h2,h3 { line-height:1.2; margin:0 0 .5em; } h1 { font-size:26pt; }
+  h2 { font-size:15pt; color:var(--brand); border-bottom:2px solid var(--brand); padding-bottom:4px; }
+  h3 { font-size:12pt; margin-top:1em; } p { margin:.35em 0 .6em; } ul,ol { margin:.3em 0 .7em; padding-left:1.4em; }
+  table { width:100%; border-collapse:collapse; margin:.4em 0 .9em; font-size:10pt; } th,td { border:1px solid var(--line); padding:4px 7px; text-align:left; vertical-align:top; } th { background:var(--soft); }
+  .num { text-align:right; white-space:nowrap; }
+  kbd { font: 600 9pt ui-monospace, Menlo, Consolas, monospace; border:1px solid var(--line); border-bottom-width:2px; border-radius:4px; padding:0 5px; background:var(--soft); }
+  .btnlike { display:inline-block; font-weight:600; font-size:9.5pt; border:1px solid var(--line); border-radius:5px; padding:0 6px; background:var(--soft); white-space:nowrap; }
+  .meta { display:flex; flex-wrap:wrap; gap:6px 16px; font-size:9.5pt; color:var(--muted); margin:-4px 0 10px; } .meta b { color:var(--ink); }
+  .box { border:1px solid var(--line); border-left:5px solid var(--brand); background:#f8fafc; border-radius:6px; padding:7px 12px; margin:.5em 0 .9em; }
+  .box.warn { border-left-color:var(--warn); background:var(--warn-soft); }
+  .box > :first-child { margin-top:0; } .box > :last-child { margin-bottom:0; }
+  .steps { counter-reset:s; list-style:none; padding-left:0; } .steps > li { counter-increment:s; position:relative; padding-left:32px; margin:.4em 0; }
+  .steps > li::before { content:counter(s); position:absolute; left:0; top:0; width:22px; height:22px; border-radius:50%; background:var(--brand); color:#fff; font-weight:700; font-size:9.5pt; display:flex; align-items:center; justify-content:center; }
+  .check { list-style:none; padding-left:0; } .check li::before { content:"☐ "; font-size:12pt; }
+  .answer { border-bottom:1px dotted #94a3b8; height:7.5mm; }
+  .field { display:flex; gap:8px; align-items:flex-end; margin:.3em 0; } .field span { white-space:nowrap; } .field i { flex:1; border-bottom:1px dotted #94a3b8; height:6mm; }
+  figure.shot { margin:.5em 0 .9em; break-inside:avoid; page-break-inside:avoid; text-align:center; }
+  figure.shot img { max-width:100%; height:auto; max-height:115mm; border:1px solid var(--line); border-radius:6px; }
+  figure.shot.s img { max-height:78mm; } figure.shot.xs img { max-height:62mm; }
+  figure.shot figcaption { font-size:8.5pt; color:var(--muted); margin-top:3px; font-style:italic; }
+  .side { display:grid; grid-template-columns:1fr 70mm; gap:12px; align-items:start; } .side figure.shot img { max-height:135mm; }
+  @media (max-width: 820px) { .side { grid-template-columns:1fr; } }
+  .cover { display:flex; flex-direction:column; } .cover .brand { color:var(--brand); font-weight:700; letter-spacing:.05em; } .cover .sub { font-size:14pt; color:var(--muted); }
+  .toc li { margin:.3em 0; }
+  .prof { --brand:var(--prof); } .prof h2 { color:var(--prof); border-color:var(--prof); } .sheet.prof { background:#fff; border-top:6px solid var(--prof); }
+  .tag-prof { display:inline-block; background:var(--prof); color:#fff; font-size:8.5pt; font-weight:700; border-radius:4px; padding:1px 6px; margin-left:6px; vertical-align:middle; }
+  body.no-prof .prof { display:none; }
+  .corr { border-left:4px solid var(--prof); background:var(--prof-soft); padding:6px 10px; margin:.4em 0 .8em; border-radius:4px; }
+  .foot { position:absolute; left:16mm; right:16mm; bottom:8mm; display:flex; justify-content:space-between; font-size:8pt; color:var(--muted); border-top:1px solid var(--line); padding-top:3px; }
+  @media (max-width: 820px) { .foot { position:static; margin-top:16px; } }
+  .avoid { break-inside:avoid; page-break-inside:avoid; }
+  @page { size:A4; margin:0; }
+  @media print { html, body { background:#fff; } .toolbar { display:none; } .sheet { margin:0; box-shadow:none; page-break-after:always; break-after:page; } }</style></head><body>
+<div class="toolbar"><b>Livret de tutoriels</b><button onclick="window.print()">Imprimer</button></div>
+<section class="sheet cover"><div class="brand">MicroWave, BLR &amp; VSAT Lab</div><h1>Livret de tutoriels</h1><p class="sub">Prise en main du simulateur de faisceaux hertziens, boucle locale radio et liaisons satellitaires — Bac Pro Télécommunications</p>
+  <div class="meta"><span><b>13 tutoriels</b> illustrés</span><span>Fiche mémo</span><span>Grille d’auto-évaluation</span></div>
+  <div class="box"><p>Chaque tutoriel se fait <b>dans le simulateur</b>, en suivant les étapes numérotées. Les tutoriels interactifs T1 à T5 (<span class="btnlike">TP</span> → onglet <b>Tutoriels</b>) vérifient vos gestes automatiquement ; ce livret les complète et sert de support papier en salle.</p></div>
+  <h3>Sommaire</h3><ol class="toc"><li>Découvrir l’interface</li><li>Poser et relier les équipements</li><li>Régler un équipement ou un lien</li><li>Lire le bilan de liaison</li><li>Profil de terrain et zone de Fresnel</li><li>Pluie, modulation adaptative et disponibilité</li><li>Station VSAT et pointage</li><li>Satellites défilants LEO et MEO</li><li>Boucle locale radio et VLAN</li><li>Réseau IP : flux, ping et anneau ERPS</li><li>Dépanner : voyants, mesures et interventions</li><li>Recette d’une liaison radio</li><li>Activités, sauvegarde, examen et documentation</li><li>Fiche mémo</li><li>Grille d’auto-évaluation</li></ol>
+  <p style="font-size:9pt;color:#475569;margin-top:8mm">Conception : Hassami COMPAORE · decompaore@gmail.com · Tél. / WhatsApp : +226 79 00 03 04</p><div class="foot"><span>MicroWave, BLR &amp; VSAT Lab — Tutoriels</span><span>1</span></div></section>
+<section class="sheet"><h2>Tutoriel 1 — Découvrir l’interface</h2><div class="meta"><span>Durée : <b>15 min</b></span><span>Objectif : <b>repérer les quatre zones de l’écran et les modes</b></span></div><figure class="shot "><img src="docs/captures/interface.png" alt="L’écran complet : barre supérieure, boîte à outils, canevas avec la console, inspecteur (TP 6 chargé, bilan d’un bond FH)."><figcaption>L’écran complet : barre supérieure, boîte à outils, canevas avec la console, inspecteur (TP 6 chargé, bilan d’un bond FH).</figcaption></figure>
+    <ol class="steps"><li>Ouvrez <code>index.html</code> (Chrome, Edge ou Firefox). Aucune installation, aucune connexion Internet.</li>
+    <li>Repérez les <b>quatre zones</b> : barre supérieure (fichiers, modes, pluie, TP, examen, documentation), boîte à outils à gauche, canevas au centre (avec le journal, la console et les flux en dessous), inspecteur à droite.</li>
+    <li>Chargez un réseau : <span class="btnlike">TP</span> → TP 6 → <span class="btnlike">Charger la topologie du TP</span>. Faites défiler la molette (zoom), faites glisser le fond (déplacement), touche <kbd>0</kbd> (tout afficher).</li>
+    <li>Cliquez sur un faisceau : l’inspecteur affiche ses <b>Paramètres</b>, son <b>Bilan de liaison</b>, son <b>Profil &amp; Fresnel</b> et la vue <b>Réseau</b>.</li></ol>
+    <figure class="shot "><img src="docs/captures/barre-superieure.png" alt="La barre supérieure : Nouveau, Ouvrir, Sauvegarder, image ; les trois modes ; le curseur de pluie ; TP, Examen, Documentation."><figcaption>La barre supérieure : Nouveau, Ouvrir, Sauvegarder, image ; les trois modes ; le curseur de pluie ; TP, Examen, Documentation.</figcaption></figure>
+    <div class="box"><p><b>À retenir</b> : vert = modulation maximale, orange = repli (pluie, dépointage, obstacle), rouge = coupure. La barre d’état (en bas) résume la santé du réseau.</p></div><div class="foot"><span>MicroWave, BLR &amp; VSAT Lab — Tutoriels</span><span>2</span></div></section>
+<section class="sheet"><h2>Tutoriel 2 — Poser et relier les équipements</h2><div class="meta"><span>Durée : <b>20 min</b></span><span>Objectif : <b>construire un bond FH complet</b></span></div><div class="side"><div><ol class="steps"><li>Glissez deux <b>Pylônes</b> sur le canevas, à au moins 5 carreaux d’écart (échelle : 1 carreau = 2 km par défaut).</li>
+    <li>Déposez une <b>Antenne parabolique</b> sur chaque pylône : elle s’y fixe (hauteur et altitude du site).</li>
+    <li>Ajoutez une <b>ODU</b> derrière chaque antenne et une <b>IDU</b> au pied de chaque pylône.</li>
+    <li>Outil <b>Lier</b> (<kbd>L</kbd>) : IDU → ODU (câble IF), ODU → antenne, puis antenne → antenne (le <b>faisceau</b>). Le type de lien est déduit automatiquement.</li>
+    <li>Tirez la <b>poignée</b> au sommet d’un pylône pour changer sa hauteur (15 à 150 m).</li></ol>
+    <div class="box"><p><b>Chaîne FH</b> : IDU — câble IF — ODU — antenne ~~~ antenne — ODU — IDU. Un maillon manquant est signalé (« ODU non alimentée »…).</p></div>
+    <p><b>Question</b> : quel équipement porte la fréquence et la puissance d’émission ?</p><div class="answer"></div><div class="answer"></div></div>
+    <figure class="shot "><img src="docs/captures/boite-a-outils.png" alt="La boîte à outils (familles d’équipements)."><figcaption>La boîte à outils (familles d’équipements).</figcaption></figure></div>
+    <figure class="shot xs"><img src="docs/captures/tp1-faisceau.png" alt="Un bond FH construit (TP 1) : pylônes, antennes, ODU, IDU et faisceau."><figcaption>Un bond FH construit (TP 1) : pylônes, antennes, ODU, IDU et faisceau.</figcaption></figure><div class="foot"><span>MicroWave, BLR &amp; VSAT Lab — Tutoriels</span><span>3</span></div></section>
+<section class="sheet"><h2>Tutoriel 3 — Régler un équipement ou un lien</h2><div class="meta"><span>Durée : <b>15 min</b></span><span>Objectif : <b>utiliser l’onglet Paramètres de l’inspecteur</b></span></div><div class="side"><div><ol class="steps"><li>Outil Sélection (<kbd>V</kbd>), cliquez sur une <b>ODU</b> : bande, puissance Tx, largeur de canal, canal, demi-bande, pertes de branchement.</li>
+    <li>Changez la bande (ex. 7 → 18 GHz) : le faisceau change de couleur si la marge devient insuffisante.</li>
+    <li>Cliquez sur l’<b>antenne</b> : diamètre (0,3 à 2,4 m), polarisation (V, H, V+H pour le XPIC), hauteur de fixation.</li>
+    <li>Cliquez sur le <b>faisceau</b> : état, distance, débit, configuration (1+0, 1+1, diversité d’espace), lien de secours, lien RPL.</li>
+    <li>Sans sélection (clic sur le fond) : <b>réglages du projet</b> (titre, origine du plan, climat, objectif de disponibilité, interférences).</li></ol>
+    <p><b>Question</b> : citez trois réglages qui modifient le niveau reçu (RSL).</p><div class="answer"></div><div class="answer"></div><div class="answer"></div></div>
+    <figure class="shot "><img src="docs/captures/inspecteur-parametres.png" alt="L’onglet Paramètres d’un faisceau (TP 1)."><figcaption>L’onglet Paramètres d’un faisceau (TP 1).</figcaption></figure></div><div class="foot"><span>MicroWave, BLR &amp; VSAT Lab — Tutoriels</span><span>4</span></div></section>
+<section class="sheet"><h2>Tutoriel 4 — Lire le bilan de liaison</h2><div class="meta"><span>Durée : <b>20 min</b></span><span>Objectif : <b>refaire le calcul du RSL et de la marge</b></span></div><div class="side"><div><ol class="steps"><li>Sélectionnez le faisceau du TP 1, onglet <b>Bilan de liaison</b>. Choisissez le sens (A → B ou B → A).</li>
+    <li>Relevez dans les cartes : distance, fréquence, RSL, marge au fading, modulation, capacité, disponibilité.</li>
+    <li>Lisez le <b>calcul pas à pas</b> : gain d’antenne, PIRE, espace libre (FSL), gaz, pluie, RSL, bruit, seuils.</li>
+    <li>Refaites le calcul du RSL à la main avec les valeurs affichées.</li></ol>
+    <table><tr><th>Grandeur</th><th>Valeur lue</th></tr><tr><td>PIRE</td><td></td></tr><tr><td>FSL</td><td></td></tr><tr><td>RSL</td><td></td></tr><tr><td>Seuil QPSK</td><td></td></tr><tr><td>Marge avant coupure</td><td></td></tr></table>
+    <div class="box"><p><b>RSL</b> = PIRE − FSL − pertes + Grx − Lbranch. <b>Marge</b> = RSL − seuil de la modulation la plus robuste.</p></div></div>
+    <figure class="shot "><img src="docs/captures/bilan-fh.png" alt="Bilan de liaison d’un bond FH : cartes de synthèse et calcul pas à pas."><figcaption>Bilan de liaison d’un bond FH : cartes de synthèse et calcul pas à pas.</figcaption></figure></div><div class="foot"><span>MicroWave, BLR &amp; VSAT Lab — Tutoriels</span><span>5</span></div></section>
+<section class="sheet"><h2>Tutoriel 5 — Profil de terrain et zone de Fresnel</h2><div class="meta"><span>Durée : <b>20 min</b></span><span>Objectif : <b>dégager la 1re zone de Fresnel</b></span></div><div class="side"><div><ol class="steps"><li>Chargez le <b>TP 2</b> : une colline est sur le trajet.</li>
+    <li>Sélectionnez le faisceau, onglet <b>Profil &amp; Fresnel</b> : terrain, courbure terrestre (k = 4/3), ligne de visée, ellipse de Fresnel.</li>
+    <li>Lisez le <b>dégagement</b> au point critique (en % du rayon de Fresnel) et la perte de diffraction.</li>
+    <li>Avec « <b>Ajuster les hauteurs</b> », surélevez les pylônes jusqu’à 60 % de dégagement, puis 100 %.</li></ol>
+    <p><b>Question</b> : quelle hauteur de pylône faut-il pour 60 % ? pour 100 % ?</p><div class="answer"></div><div class="answer"></div>
+    <div class="box"><p><b>Règle</b> : au moins 60 % de la 1re zone de Fresnel dégagés ; rayon r1 = 17,32·√(d1·d2 / (f·d)).</p></div></div>
+    <figure class="shot "><img src="docs/captures/profil-fresnel.png" alt="Profil de terrain du TP 2 : colline dans la zone de Fresnel."><figcaption>Profil de terrain du TP 2 : colline dans la zone de Fresnel.</figcaption></figure></div><div class="foot"><span>MicroWave, BLR &amp; VSAT Lab — Tutoriels</span><span>6</span></div></section>
+<section class="sheet"><h2>Tutoriel 6 — Pluie, modulation adaptative et disponibilité</h2><div class="meta"><span>Durée : <b>20 min</b></span><span>Objectif : <b>observer l’ACM pendant un orage</b></span></div><ol class="steps"><li>Chargez le <b>TP 3</b> (bond 15 GHz en 256QAM avec XPIC). Passez en mode <span class="btnlike">Météo &amp; Propagation</span>.</li>
+    <li>Montez la <b>pluie</b> à 40, 60 puis 80 mm/h : notez la modulation et le débit à chaque palier (journal d’événements).</li>
+    <li>Cliquez sur <span class="btnlike">Simuler un orage</span> : la pluie monte de 0 à 100 mm/h puis redescend ; l’ACM se replie puis remonte.</li>
+    <li>Dans le bilan, lisez la <b>disponibilité annuelle</b> (UIT-R P.530) et comparez-la à l’objectif des réglages du projet.</li></ol>
+    <figure class="shot "><img src="docs/captures/pluie-acm.png" alt="Mode Météo : pluie à 80 mm/h, faisceau en repli de modulation (orange)."><figcaption>Mode Météo : pluie à 80 mm/h, faisceau en repli de modulation (orange).</figcaption></figure>
+    <table><tr><th>Pluie</th><th>0 mm/h</th><th>40 mm/h</th><th>60 mm/h</th><th>80 mm/h</th></tr><tr><td>Modulation</td><td></td><td></td><td></td><td></td></tr><tr><td>Débit (Mbit/s)</td><td></td><td></td><td></td><td></td></tr></table><div class="foot"><span>MicroWave, BLR &amp; VSAT Lab — Tutoriels</span><span>7</span></div></section>
+<section class="sheet"><h2>Tutoriel 7 — Station VSAT et pointage</h2><div class="meta"><span>Durée : <b>25 min</b></span><span>Objectif : <b>pointer une parabole et lire le bilan satellite</b></span></div><div class="side"><div><ol class="steps"><li>Chargez le <b>TP 5</b> (site minier relié au téléport par un satellite GEO en bande Ku).</li>
+    <li>Sélectionnez la liaison satellite de la station distante, onglet <b>Profil &amp; Fresnel</b> : l’<b>aide au pointage</b> donne azimut, élévation et skew.</li>
+    <li>Décochez « Pointage automatique » sur l’antenne VSAT et saisissez un azimut décalé de 1° : observez la perte de pointage et l’Eb/N0.</li>
+    <li>Onglet <b>Bilan de liaison</b> : voies montante et descendante, C/N, Eb/N0, MODCOD DVB-S2X, latence RTT.</li></ol>
+    <table><tr><th>Grandeur</th><th>Valeur</th></tr><tr><td>Azimut · élévation · skew</td><td></td></tr><tr><td>PIRE de la station</td><td></td></tr><tr><td>Eb/N0 voie aller</td><td></td></tr><tr><td>RTT</td><td></td></tr></table></div>
+    <figure class="shot "><img src="docs/captures/vsat-pointage.png" alt="Aide au pointage d’une station VSAT."><figcaption>Aide au pointage d’une station VSAT.</figcaption></figure></div>
+    <div class="box"><p><b>Chaîne VSAT</b> : modem — BUC + LNB — antenne VSAT ~~~ satellite ~~~ Hub — routeur. La latence d’un GEO (≈ 520 ms aller-retour) se mesure au ping.</p></div><div class="foot"><span>MicroWave, BLR &amp; VSAT Lab — Tutoriels</span><span>8</span></div></section>
+<section class="sheet"><h2>Tutoriel 8 — Satellites défilants LEO et MEO</h2><div class="meta"><span>Durée : <b>20 min</b></span><span>Objectif : <b>comparer la latence GEO / LEO, observer les handovers</b></span></div><ol class="steps"><li>Chargez le <b>TP 13</b> (constellation LEO à 550 km).</li>
+    <li>Sur le satellite, réglez <b>Mouvement</b> = « Défilement réel ». L’horloge apparaît dans la barre du canevas : ▶, vitesse ×60.</li>
+    <li>Observez l’élévation, la distance, la latence et le <b>décalage Doppler</b> ; au coucher d’un satellite, le terminal bascule sur le suivant (<b>handover</b>).</li>
+    <li>Diminuez le nombre de satellites par plan : des <b>trous de couverture</b> apparaissent.</li></ol>
+    <figure class="shot "><img src="docs/captures/leo-defilant.png" alt="Constellation LEO : terminal et passerelle reliés au satellite servant."><figcaption>Constellation LEO : terminal et passerelle reliés au satellite servant.</figcaption></figure>
+    <p><b>Question</b> : comparez le RTT mesuré avec un satellite GEO et avec la constellation LEO. Pourquoi cet écart ?</p><div class="answer"></div><div class="answer"></div><div class="answer"></div><div class="foot"><span>MicroWave, BLR &amp; VSAT Lab — Tutoriels</span><span>9</span></div></section>
+<section class="sheet"><h2>Tutoriel 9 — Boucle locale radio et VLAN</h2><div class="meta"><span>Durée : <b>20 min</b></span><span>Objectif : <b>raccorder des abonnés et isoler leurs trafics</b></span></div><ol class="steps"><li>Chargez le <b>TP 4</b> : une station de base 3,5 GHz dessert trois entreprises (CPE).</li>
+    <li>Sélectionnez la station de base : azimut et ouverture du secteur (90° ou 120°). Un CPE hors secteur perd plusieurs dB.</li>
+    <li>Réglez le <b>VLAN d’accès</b> de chaque CPE (100, 200, 300 : un VLAN par entreprise), puis les <b>VLAN autorisés</b> sur le switch.</li>
+    <li>Outil <b>Ping</b> (<kbd>P</kbd>) entre deux entreprises de VLAN différents : le trafic doit être isolé.</li></ol>
+    <figure class="shot "><img src="docs/captures/blr-vlan.png" alt="Boucle locale radio du TP 4 : station de base sectorielle et CPE des entreprises."><figcaption>Boucle locale radio du TP 4 : station de base sectorielle et CPE des entreprises.</figcaption></figure>
+    <div class="box"><p><b>À retenir</b> : le débit d’un secteur est <b>partagé</b> entre ses abonnés ; chaque client a son VLAN, de bout en bout.</p></div><div class="foot"><span>MicroWave, BLR &amp; VSAT Lab — Tutoriels</span><span>10</span></div></section>
+<section class="sheet"><h2>Tutoriel 10 — Réseau IP : flux, ping et anneau ERPS</h2><div class="meta"><span>Durée : <b>25 min</b></span><span>Objectif : <b>vérifier la continuité de service sur un anneau</b></span></div><ol class="steps"><li>Chargez le <b>TP 6</b> (anneau FH IP/MPLS avec secours VSAT). Onglet <b>Flux de trafic</b> de la console : chemin, débit, état de chaque service.</li>
+    <li>Sélectionnez un bond, onglet <b>Réseau</b> : état de l’anneau ERPS, lien RPL, LSP MPLS.</li>
+    <li>Passez en mode <span class="btnlike">Dépannage</span>, outil <b>Panne</b> (<kbd>C</kbd>), coupez un bond : le RPL se débloque, le trafic repasse par l’autre côté.</li>
+    <li>Coupez un second bond : le site isolé bascule sur le <b>lien de secours</b> VSAT (latence plus élevée).</li></ol>
+    <figure class="shot "><img src="docs/captures/anneau-flux.png" alt="Anneau du TP 6 et tableau des flux de trafic."><figcaption>Anneau du TP 6 et tableau des flux de trafic.</figcaption></figure><div class="foot"><span>MicroWave, BLR &amp; VSAT Lab — Tutoriels</span><span>11</span></div></section>
+<section class="sheet"><h2>Tutoriel 11 — Dépanner : voyants, mesures et interventions</h2><div class="meta"><span>Durée : <b>30 min</b></span><span>Objectif : <b>localiser une panne par la mesure avant d’intervenir</b></span></div><div class="side"><div><ol class="steps"><li>Chargez le <b>TP 12</b> ou le <b>TP 16</b> (pannes cachées) et passez en mode <span class="btnlike">Dépannage</span>.</li>
+    <li><b>Constater</b> : quels services sont coupés ? (flux, ping).</li>
+    <li><b>Localiser</b> : traceroute, <b>voyants</b> des équipements, bilan de liaison (« RSL calculé » / « RSL mesuré »).</li>
+    <li><b>Intervenir</b> : encadré « Intervention sur site » (remplacer, repointer, refaire le branchement, reprendre le câble) ou correction du réglage erroné.</li>
+    <li><b>Vérifier</b> par une nouvelle mesure et noter l’intervention.</li></ol>
+    <div class="box warn"><p>Le simulateur ne dit jamais si un élément était en panne : seule la <b>mesure</b> le prouve. Une intervention inutile est pénalisée à l’examen.</p></div></div>
+    <figure class="shot "><img src="docs/captures/depannage-interventions.png" alt="Mode Dépannage : paramètres, voyants et interventions d’une ODU."><figcaption>Mode Dépannage : paramètres, voyants et interventions d’une ODU.</figcaption></figure></div>
+    <table><tr><th>Symptôme</th><th>Mesure</th><th>Cause supposée</th><th>Action</th><th>Vérification</th></tr><tr><td style="height:12mm"></td><td></td><td></td><td></td><td></td></tr><tr><td style="height:12mm"></td><td></td><td></td><td></td><td></td></tr></table><div class="foot"><span>MicroWave, BLR &amp; VSAT Lab — Tutoriels</span><span>12</span></div></section>
+<section class="sheet"><h2>Tutoriel 12 — Recette d’une liaison radio</h2><div class="meta"><span>Durée : <b>20 min</b></span><span>Objectif : <b>comparer mesure et calcul, conclure</b></span></div><div class="side"><div><ol class="steps"><li>Chargez le TP 6. Pour chaque liaison, lisez la valeur <b>mesurée</b> sur l’équipement de réception (onglet Bilan de liaison).</li>
+    <li>Cliquez sur le fond du canevas, onglet <b>Bilan de liaison</b> : la <b>fiche de recette</b> liste chaque grandeur à contrôler.</li>
+    <li>Saisissez chaque mesure : l’<b>écart</b> (mesure − calcul) et la conclusion s’affichent.</li>
+    <li>Cliquez sur <span class="btnlike">Rapport de recette</span> : imprimez-le et signez-le.</li></ol>
+    <table><tr><th>Écart</th><th>Conclusion</th></tr><tr><td>−3 à +3 dB</td><td>Conforme</td></tr><tr><td>&lt; −3 dB</td><td>Non conforme : perte anormale</td></tr><tr><td>&gt; +3 dB</td><td>Suspect : vérifier la lecture</td></tr></table></div>
+    <figure class="shot "><img src="docs/captures/fiche-recette.png" alt="La fiche de recette (onglet Bilan, sans sélection)."><figcaption>La fiche de recette (onglet Bilan, sans sélection).</figcaption></figure></div><div class="foot"><span>MicroWave, BLR &amp; VSAT Lab — Tutoriels</span><span>13</span></div></section>
+<section class="sheet"><h2>Tutoriel 13 — Activités, sauvegarde, examen et documentation</h2><div class="meta"><span>Durée : <b>15 min</b></span><span>Objectif : <b>travailler en TP et rendre son travail</b></span></div><figure class="shot xs"><img src="docs/captures/activites-tp.png" alt="La fenêtre des activités : tutoriels guidés, TP, exercices corrigés."><figcaption>La fenêtre des activités : tutoriels guidés, TP, exercices corrigés.</figcaption></figure>
+    <ol class="steps"><li><span class="btnlike">TP</span> : choisissez un TP, <span class="btnlike">Charger la topologie du TP</span> ; les consignes s’affichent dans un panneau flottant et chaque étape est <b>vérifiée automatiquement</b>. <span class="btnlike">📄 Fiche élève</span> imprime la fiche du TP.</li>
+    <li><b>Sauvegarder</b> (<kbd>Ctrl</kbd>+<kbd>S</kbd>) : fichier <code>.json</code> à rouvrir avec <b>Ouvrir</b>. Le bouton image exporte le schéma (SVG) pour le compte rendu.</li>
+    <li><b>Examen</b> : <span class="btnlike">Ouvrir</span> le fichier <code>sujet-….json</code> du professeur, identité, <span class="btnlike">Commencer l’examen</span> ; pendant l’épreuve : <span class="btnlike">📋 Consignes</span>, <span class="btnlike">Ma copie</span>, <span class="btnlike">📤 Rendre ma copie</span> (ou <kbd>Ctrl</kbd>+<kbd>S</kbd>).</li>
+    <li><span class="btnlike">Documentation</span> : guide de l’utilisateur, instruments, fiches d’ingénierie, cours, aide-mémoire, avec une recherche.</li></ol>
+    <figure class="shot xs"><img src="docs/captures/documentation.png" alt="La documentation, classée par rubriques."><figcaption>La documentation, classée par rubriques.</figcaption></figure><div class="foot"><span>MicroWave, BLR &amp; VSAT Lab — Tutoriels</span><span>14</span></div></section>
+<section class="sheet"><h2>Fiche mémo — valeurs et formules de référence</h2><table><tr><th>Grandeur</th><th>Formule / valeur</th></tr>
+  <tr><td>Puissance</td><td><code>P(dBm) = 10·log(P / 1 mW)</code> ; 1 W = 30 dBm = 0 dBW ; ×2 = +3 dB</td></tr>
+  <tr><td>Espace libre</td><td><code>FSL = 92,45 + 20·log(d km) + 20·log(f GHz)</code></td></tr>
+  <tr><td>Gain d’une parabole</td><td><code>G = 10·log(η·(π·D/λ)²)</code> ; 1,2 m à 7 GHz ≈ 36,5 dBi ; 0,6 m à 15 GHz ≈ 37 dBi</td></tr>
+  <tr><td>Niveau reçu</td><td><code>RSL = PIRE − FSL − pertes + Grx − Lbranch</code></td></tr>
+  <tr><td>Bruit thermique</td><td><code>N = −174 + 10·log(B Hz) + NF</code></td></tr>
+  <tr><td>Fresnel</td><td><code>r1 = 17,32·√(d1·d2 / (f·d))</code> ; dégagement ≥ 60 %</td></tr>
+  <tr><td>Renflement terrestre</td><td><code>h = d1·d2 / (12,74·k)</code>, k = 4/3</td></tr>
+  <tr><td>Pluie</td><td><code>γ = k·R^α</code> (UIT-R P.838) ; forte au-delà de 10 GHz</td></tr>
+  <tr><td>Satellite</td><td><code>C/N0 = PIRE − FSL + G/T + 228,6</code> ; <code>Eb/N0 = C/N0 − 10·log(débit)</code></td></tr>
+  <tr><td>Latence</td><td>GEO ≈ 520 à 600 ms RTT ; MEO 130 à 150 ms ; LEO 25 à 45 ms</td></tr></table>
+  <h3>Bandes FH (portée typique)</h3><table><tr><th>6 GHz</th><th>7/8 GHz</th><th>11/13 GHz</th><th>15/18 GHz</th><th>23 GHz</th><th>E-Band</th></tr><tr><td>30–60 km</td><td>20–50 km</td><td>10–30 km</td><td>5–20 km</td><td>3–10 km</td><td>0,5–3 km</td></tr></table>
+  <h3>Raccourcis</h3><p><kbd>V</kbd> sélection · <kbd>L</kbd> lier · <kbd>F</kbd> flux · <kbd>P</kbd> ping · <kbd>C</kbd> panne · <kbd>Suppr</kbd> supprimer · <kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Y</kbd> annuler / rétablir · <kbd>Ctrl</kbd>+<kbd>S</kbd> sauvegarder (en examen : rendre la copie) · <kbd>0</kbd> tout afficher</p><div class="foot"><span>MicroWave, BLR &amp; VSAT Lab — Tutoriels</span><span>15</span></div></section>
+<section class="sheet"><h2>Grille d’auto-évaluation — Je maîtrise MicroWave, BLR &amp; VSAT Lab</h2><div class="meta"><span>Nom : ..............................</span><span>Classe : ..........</span></div><table><tr><th>Je sais…</th><th>Non</th><th>En partie</th><th>Oui</th></tr><tr><td>repérer les zones de l’écran et changer de mode</td><td>☐</td><td>☐</td><td>☐</td></tr><tr><td>construire un bond FH complet (IDU, ODU, antennes, faisceau)</td><td>☐</td><td>☐</td><td>☐</td></tr><tr><td>régler la bande, la puissance, le diamètre et la polarisation</td><td>☐</td><td>☐</td><td>☐</td></tr><tr><td>lire et refaire le calcul du RSL et de la marge</td><td>☐</td><td>☐</td><td>☐</td></tr><tr><td>dégager la zone de Fresnel en ajustant les hauteurs</td><td>☐</td><td>☐</td><td>☐</td></tr><tr><td>expliquer l’effet de la pluie et le rôle de l’ACM</td><td>☐</td><td>☐</td><td>☐</td></tr><tr><td>lire la disponibilité d’un bond et la comparer à l’objectif</td><td>☐</td><td>☐</td><td>☐</td></tr><tr><td>pointer une station VSAT (azimut, élévation, skew)</td><td>☐</td><td>☐</td><td>☐</td></tr><tr><td>comparer la latence GEO, MEO et LEO</td><td>☐</td><td>☐</td><td>☐</td></tr><tr><td>raccorder des abonnés BLR et les isoler par VLAN</td><td>☐</td><td>☐</td><td>☐</td></tr><tr><td>créer un flux, faire un ping et lire un traceroute</td><td>☐</td><td>☐</td><td>☐</td></tr><tr><td>expliquer le basculement d’un anneau ERPS et d’un lien de secours</td><td>☐</td><td>☐</td><td>☐</td></tr><tr><td>dépanner : constater, localiser par la mesure, intervenir, vérifier</td><td>☐</td><td>☐</td><td>☐</td></tr><tr><td>remplir une fiche de recette et conclure sur la conformité</td><td>☐</td><td>☐</td><td>☐</td></tr><tr><td>sauvegarder mon travail et rendre une copie d’examen</td><td>☐</td><td>☐</td><td>☐</td></tr></table>
+  <h3>Ce que je dois retravailler</h3><div class="answer"></div><div class="answer"></div><div class="answer"></div><div class="answer"></div><div class="foot"><span>MicroWave, BLR &amp; VSAT Lab — Tutoriels</span><span>16</span></div></section>
+</body></html>

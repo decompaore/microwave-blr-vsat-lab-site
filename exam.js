@@ -2,7 +2,7 @@
  * exam.js — Mode examen avec correction automatique
  * MicroWave, BLR & VSAT Lab
  *
- * Trois espaces (onglet « Examen » de la fenêtre Activités) :
+ * Fenêtre « Examen » (bouton de la barre supérieure, toutes versions) :
  *
  *  1. CRÉER UN SUJET (enseignant, code requis, version enseignant) :
  *     choix des exercices et des TP, durée, documentation autorisée,
@@ -29,7 +29,18 @@
  *     ENCODÉS dans le sujet et la copie (illisibles dans un éditeur de texte ;
  *     ce n'est pas un chiffrement).
  *
- * Interface : MBV.Exam = { render({ nav, detail, api }) }
+ *  5. SUJETS INDIVIDUELS (enseignant) : un sujet nominatif par élève, avec
+ *     ses propres pannes cachées tirées au hasard (en plus des pannes communes
+ *     du canevas). Archive .zip (un sujet par élève + CORRIGE-ne-pas-distribuer.csv)
+ *     ou écriture dans un dossier (Chrome / Edge). À la correction, une copie
+ *     rendue avec le sujet d'un autre élève est signalée, les copies manquantes
+ *     sont listées.
+ *
+ * Pendant l'épreuve, la barre supérieure affiche : élève, temps restant,
+ * « Consignes », « Ma copie » et « Rendre ma copie » (aussi Ctrl+S). Le bouton
+ * « Ouvrir » reconnaît un fichier sujet (et, dans la version enseignant, une copie).
+ *
+ * Interface : MBV.Exam = { render({ nav, detail, api }), openJson(json), submitAsk(), active() }
  * ===================================================================== */
 (function (root) {
   'use strict';
@@ -41,6 +52,7 @@
   const LS_GRADES = 'mbv-examen-notes-v1';
   const SUJET_FORMAT = 'mbv-exam-sujet';
   const COPIE_FORMAT = 'mbv-exam-copie';
+  const LS_SERIES = 'mbv-examen-series-v1'; // listes d'élèves des sujets individuels (copies manquantes)
 
   let ctx = null; // { nav, detail, api }
   let exam = null; // examen en cours (élève)
@@ -49,7 +61,7 @@
   let view = 'home'; // home | create | grade
   let draft = null; // sujet en cours de création
   let pendingSujet = null; // sujet chargé, examen pas encore commencé
-  const grading = { sujet: null, copies: [], selected: null };
+  const grading = { sujet: null, copies: [], selected: null, bareme: null };
   let timer = null;
 
   /* ------------------------------------------------------------------
@@ -195,13 +207,15 @@
     const teacher = ctx.api.hasAnswerKeys();
     const s = pendingSujet;
     let h = `<div class="lab-header"><div><div class="small-muted">Mode examen</div><h3>Passer un examen</h3></div></div>
-      <ol class="exam-howto"><li>Chargez le fichier <b>sujet</b> fourni par votre professeur (clé USB, dossier partagé…).</li><li>Indiquez votre nom, votre prénom et votre classe, puis cliquez sur <b>Commencer</b> : le chronomètre démarre.</li><li>Pendant l’examen, les corrections, les indices et les vérifications automatiques sont masqués.</li><li>À la fin, cliquez sur <b>Rendre ma copie</b> : un fichier <code>copie-NOM-PRENOM.json</code> est téléchargé. Remettez-le à votre professeur.</li></ol>
+      <ol class="exam-howto"><li>Chargez le fichier <b>sujet</b> fourni par votre professeur (clé USB, dossier partagé…) : ci-dessous, ou bouton <b>Ouvrir</b> de la barre supérieure.</li><li>Indiquez votre nom, votre prénom et votre classe, puis cliquez sur <b>Commencer</b> : le chronomètre démarre.</li><li>Pendant l’examen, les corrections, les indices et les vérifications automatiques sont masqués. Les <b>consignes</b> restent accessibles dans la barre supérieure.</li><li>À la fin, cliquez sur <b>Rendre ma copie</b> (barre supérieure, ou <kbd>Ctrl</kbd>+<kbd>S</kbd>) : un fichier <code>copie-NOM-PRENOM.json</code> est enregistré. Remettez-le à votre professeur.</li></ol>
       <div class="exam-box">
         <div class="field"><label>Fichier sujet</label><input type="file" id="ex-sujet-file" accept=".json,application/json"></div>
         ${s ? `<div class="verdict ok">Sujet chargé : <b>${esc(s.title)}</b> — durée ${s.durationMin} min · ${s.exercises.length} exercice(s) · ${s.tps.length} TP${s.pratique ? ' · dépannage pratique' : ''} · documentation ${s.docAllowed ? 'autorisée' : '<b>non autorisée</b>'}</div>` : ''}
-        <div class="field"><label>Nom</label><input type="text" id="ex-nom" autocomplete="off"></div>
-        <div class="field"><label>Prénom</label><input type="text" id="ex-prenom" autocomplete="off"></div>
-        <div class="field"><label>Classe</label><input type="text" id="ex-classe" autocomplete="off"></div>
+        ${s && s.nominatif ? `<div class="verdict warn" id="ex-nominatif">Sujet nominatif : <b>${esc(s.nominatif.nom)} ${esc(s.nominatif.prenom)}</b>${s.nominatif.classe ? ' (' + esc(s.nominatif.classe) + ')' : ''}. Si ce n’est pas votre nom, signalez-le au professeur.</div>` : ''}
+        ${s && s.consignes ? consignesHtml(s) : ''}
+        <div class="field"><label>Nom</label><input type="text" id="ex-nom" autocomplete="off" value="${s && s.nominatif ? esc(s.nominatif.nom) : ''}" ${s && s.nominatif ? 'readonly' : ''}></div>
+        <div class="field"><label>Prénom</label><input type="text" id="ex-prenom" autocomplete="off" value="${s && s.nominatif ? esc(s.nominatif.prenom) : ''}" ${s && s.nominatif ? 'readonly' : ''}></div>
+        <div class="field"><label>Classe</label><input type="text" id="ex-classe" autocomplete="off" value="${s && s.nominatif && s.nominatif.classe ? esc(s.nominatif.classe) : ''}"></div>
         <div class="btn-row"><button class="btn btn-accent" id="ex-start" ${s ? '' : 'disabled'}>▶ Commencer l’examen</button></div>
         <div id="ex-home-msg"></div>
       </div>`;
@@ -292,8 +306,55 @@
       const last = bar.lastElementChild;
       bar.insertBefore(b, last);
     }
-    b.innerHTML = `<span>🎓 ${esc(exam.student.prenom)} ${esc(exam.student.nom)}</span><span class="exam-clock">—</span><button class="btn btn-xs btn-accent" id="exam-banner-open">Ma copie</button>`;
+    b.innerHTML = `<span>🎓 ${esc(exam.student.prenom)} ${esc(exam.student.nom)}</span><span class="exam-clock">—</span><button class="btn btn-xs" id="exam-banner-consignes" title="Consignes de l’épreuve">📋 Consignes</button><button class="btn btn-xs" id="exam-banner-open" title="Exercices, TP et dépannage de l’épreuve">Ma copie</button><button class="btn btn-xs btn-danger" id="exam-banner-submit" title="Terminer l’épreuve et rendre la copie (Ctrl+S)">📤 Rendre ma copie</button>`;
     b.querySelector('#exam-banner-open').addEventListener('click', () => ctx.api.openLabs(undefined, 'exam'));
+    b.querySelector('#exam-banner-consignes').addEventListener('click', showConsignes);
+    b.querySelector('#exam-banner-submit').addEventListener('click', submitAsk);
+  }
+  function consignesHtml(s) {
+    return `<div class="exam-consignes"><b>📋 Consignes</b><div>${esc(s.consignes).replace(/\n/g, '<br>')}</div></div>`;
+  }
+  /** Fenêtre « Consignes » (barre supérieure pendant l'épreuve). */
+  function showConsignes() {
+    if (!exam) return;
+    const s = exam.sujet;
+    ctx.api.dialog(
+      'Consignes — ' + s.title,
+      `<p><b>${esc(exam.student.prenom)} ${esc(exam.student.nom)}</b> (${esc(exam.student.classe)}) · durée ${s.durationMin} min · temps restant <b class="exam-clock">${clock(remaining())}</b></p>
+      <p>${s.exercises.length} exercice(s) · ${s.tps.length} TP${s.pratique ? ' · dépannage pratique (réseau verrouillé : seuls les réglages, les mesures et les interventions sont permis)' : ''} · documentation ${s.docAllowed ? 'autorisée' : '<b>non autorisée</b>'}.</p>
+      ${s.consignes ? consignesHtml(s) : '<p class="small-muted">Pas de consigne particulière.</p>'}
+      <p class="small-muted">Pour terminer : <b>Rendre ma copie</b> dans la barre supérieure, ou <kbd>Ctrl</kbd>+<kbd>S</kbd>. À la fin du temps, la copie est rendue automatiquement.</p>`
+    );
+  }
+  /** Demande confirmation puis rend la copie (bouton de la barre supérieure, Ctrl+S). */
+  function submitAsk() {
+    if (!exam) return false;
+    const left = clock(remaining());
+    if (root.confirm(`Rendre votre copie maintenant ? (temps restant : ${left})\nVous ne pourrez plus la modifier.`)) submit(false);
+    return true;
+  }
+  /**
+   * Fichier ouvert par le bouton « Ouvrir » : sujet (élève) ou copie (enseignant).
+   * Renvoie true si le fichier a été reconnu et traité.
+   */
+  function openJson(j) {
+    if (!j || (j.format !== SUJET_FORMAT && j.format !== COPIE_FORMAT)) return false;
+    const api = MBV.App;
+    if (!ctx) ctx = { nav: document.getElementById('labs-list'), detail: document.getElementById('labs-detail'), api };
+    if (j.format === SUJET_FORMAT) {
+      if (exam) {
+        api.toast('Un examen est déjà en cours : rendez d’abord votre copie.', 'warn');
+        return true;
+      }
+      pendingSujet = j;
+      view = 'home';
+      api.openLabs(undefined, 'exam');
+      api.toast('Sujet chargé : indiquez votre identité, puis « Commencer l’examen ».', 'ok');
+      return true;
+    }
+    
+    api.toast('Ce fichier est une copie d’examen : elle se corrige dans la version enseignant.', 'warn');
+    return true;
   }
   function removeBanner() {
     const b = document.getElementById('exam-banner');
@@ -376,7 +437,7 @@
     const s = exam.sujet;
     const idx = exoIndex();
     let h = `<div class="lab-header"><div><div class="small-muted">Examen en cours · ${esc(exam.student.prenom)} ${esc(exam.student.nom)} · ${esc(exam.student.classe)} · commencé à ${hhmm(exam.startedAt)}</div><h3>${esc(s.title)}</h3></div><div class="exam-timer">⏱ <span class="exam-clock">—</span></div></div>
-      <div class="note">Les corrections, indices et vérifications automatiques sont masqués. Vos réponses sont enregistrées automatiquement sur ce poste (même en cas de rechargement de la page).</div>`;
+      <div class="note">Les corrections, indices et vérifications automatiques sont masqués. Vos réponses sont enregistrées automatiquement sur ce poste (même en cas de rechargement de la page). Pour terminer : <b>Rendre ma copie</b> (barre supérieure ou <kbd>Ctrl</kbd>+<kbd>S</kbd>).</div>${s.nominatif ? `<div class="small-muted">Sujet nominatif : ${esc(s.nominatif.nom)} ${esc(s.nominatif.prenom)}</div>` : ''}${s.consignes ? consignesHtml(s) : ''}`;
     if (s.exercises.length) {
       h += '<h4>Exercices</h4>';
       s.exercises.forEach((it, n) => {
@@ -475,6 +536,7 @@
       capturePratique();
       loadPratique();
       const result = { faults: ctx.api.faultStatus(exam.pratique.faults), flows: ctx.api.flowStatus() };
+      if (ctx.api.recetteRows && (ctx.api.recetteOn() || ctx.api.recetteRows().some((r) => r.mesure !== null))) result.recette = ctx.api.recetteRows();
       pratique = { data: enc({ topo: exam.pratique.topo, journal: exam.pratique.journal, result }) };
       ctx.api.setLocked(false);
     }
@@ -507,9 +569,25 @@
     const name = `copie-${slug(c.student.nom)}-${slug(c.student.prenom)}.json`;
     ctx.detail.innerHTML = `<div class="lab-header"><div><div class="small-muted">Examen terminé</div><h3>Copie rendue ✔</h3></div></div>
       <div class="verdict ok">${esc(c.student.prenom)} ${esc(c.student.nom)} (${esc(c.student.classe)}) — « ${esc(c.sujet.title)} » — rendue à ${hhmm(c.submittedAt)}${c.autoSubmitted ? ' (temps écoulé)' : ''}.</div>
-      <p>Le fichier <code>${esc(name)}</code> a été téléchargé (dossier « Téléchargements »). Remettez-le à votre professeur selon ses consignes (dossier partagé, clé USB…).</p>
-      <div class="btn-row"><button class="btn" id="ex-redl">⬇ Télécharger à nouveau ma copie</button></div>`;
+      <p>Le fichier <code>${esc(name)}</code> a été téléchargé (dossier « Téléchargements »). Remettez-le à votre professeur selon ses consignes : dépôt dans le dossier des copies de la classe, clé USB…</p>
+      <div class="btn-row">${root.showSaveFilePicker ? '<button class="btn btn-accent" id="ex-depot" title="Enregistrer la copie dans le dossier indiqué par le professeur (ex. Copies\\classe sur le partage) : il sera proposé la fois suivante">📁 Déposer dans le dossier de la classe…</button>' : ''}<button class="btn" id="ex-redl">⬇ Télécharger à nouveau ma copie</button></div>
+      <div id="ex-depot-msg"></div>`;
     ctx.detail.querySelector('#ex-redl').addEventListener('click', () => download(name, JSON.stringify(c, null, 1)));
+    const dep = ctx.detail.querySelector('#ex-depot');
+    if (dep)
+      dep.addEventListener('click', async () => {
+        const msg = ctx.detail.querySelector('#ex-depot-msg');
+        try {
+          const h = await root.showSaveFilePicker({ id: 'mbv-copies', suggestedName: name, types: [{ description: 'Copie d’examen', accept: { 'application/json': ['.json'] } }] });
+          const w = await h.createWritable();
+          await w.write(JSON.stringify(c, null, 1));
+          await w.close();
+          msg.innerHTML = `<div class="verdict ok">Copie déposée (${esc(h.name)}). Le dossier sera proposé la prochaine fois.</div>`;
+          ctx.api.log('📤 Copie déposée dans le dossier choisi : ' + h.name, 'ok');
+        } catch (e) {
+          if (!e || e.name !== 'AbortError') msg.innerHTML = '<div class="verdict err">Dépôt impossible dans ce dossier (droits ?) : remettez le fichier téléchargé à votre professeur.</div>';
+        }
+      });
   }
 
   
@@ -536,6 +614,9 @@
   MBV.Exam = {
     render,
     onProgress,
+    openJson,
+    submitAsk,
+    active: () => !!exam,
     /* accès pour les tests et l'intégration */
     
     _state: () => ({ exam, view, teacherOk, grading }),
