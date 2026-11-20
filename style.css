@@ -3483,3 +3483,11 @@ body.exam-mode #exam-banner {
 body.resizing {
   user-select: none;
 }
+/* Poignées des obstacles (hauteur, largeur) et des immeubles (étages) */
+.obstacle-mast {
+  stroke-dasharray: 3 3;
+  opacity: 0.7;
+}
+.width-handle {
+  cursor: ew-resize;
+}

@@ -1,5 +1,5 @@
 MicroWave, BLR & VSAT Lab — VERSION ENSEIGNANT PROTÉGÉE
-Version : 2026-11-20-ef17016
+Version : 2026-11-20-6a3cc0b
 
 Ouvrir index.html puis saisir le mot de passe de l’établissement. Fonctionne aussi hors ligne.
 Le contenu (corrigés, examens, outils de l’enseignant) est chiffré (AES-256) : sans le mot

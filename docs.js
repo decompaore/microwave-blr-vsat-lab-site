@@ -146,7 +146,9 @@
           html: `<ul><li><b>Glissez</b> un élément de la boîte à outils sur le canevas (ou cliquez-le, puis cliquez sur le canevas).</li>
             <li><b>Sites</b> : un <b>pylône</b> (15 à 150 m) ou un <b>toit-terrasse</b> (immeuble R+N) porte les antennes. Déposée sur un pylône ou un immeuble, une antenne, une ODU ou une radio Full-Outdoor s’y <b>fixe</b> : elle prend la hauteur et l’altitude du site et se déplace avec lui.</li>
             <li><b>Hauteur d’un pylône</b> : tirez la <b>poignée</b> à son sommet sur le canevas, ou réglez-la dans ses Paramètres, ou sous le profil de Fresnel (« Ajuster les hauteurs »). Les antennes fixées au sommet suivent.</li>
-            <li><b>Obstacles</b> (relief / colline, arbres / forêt, bâtiment haut) : posés entre deux sites, ils apparaissent sur le profil des bonds qu’ils traversent. Leur hauteur et leur largeur se règlent dans l’inspecteur.</li>
+            <li><b>Obstacles</b> (relief / colline, arbres / forêt, bâtiment haut) : posés entre deux sites, ils apparaissent sur le profil des bonds qu’ils traversent. Réglez-les <b>à la souris</b> : la poignée du haut règle la <b>hauteur</b> (5 à 400 m), la poignée ◀ ▶ à droite du disque règle la <b>largeur</b> (emprise) ; ou dans l’inspecteur.</li>
+            <li><b>Immeuble (toit-terrasse)</b> : la poignée « R+N » au-dessus de l’immeuble règle le <b>nombre d’étages</b> à la souris ; les équipements posés sur le toit suivent.</li>
+            <li><b>Orientation</b> : une fois le faisceau créé, chaque antenne FH (ou radio Full-Outdoor) se tourne vers l’antenne d’en face, et chaque CPE vers sa station de base : les deux antennes d’un bond se font face, en visibilité directe.</li>
             <li><b>Altitude du sol</b> : réglable pour chaque site ; le profil en tient compte.</li></ul>`,
         },
         {

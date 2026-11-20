@@ -52,6 +52,8 @@
   const REF = { lat: 12.37, lon: -1.53 }; // Ouagadougou : origine du plan
   const C_KM_MS = 299.792458; // km par ms
   const MAST_PX_PER_M = 0.9; // longueur du mât dessiné au-dessus d'un pylône (px par mètre)
+  const OBST_PX_PER_M = 0.35; // jauge de hauteur d'un obstacle (px par mètre)
+  const FLOOR_PX = 4; // jauge d'un immeuble (px par étage)
   const TOWER_MIN_M = 15; // hauteur minimale d'un pylône (m)
   const TOWER_MAX_M = 150; // hauteur maximale d'un pylône (m)
   const STATUS_RANK = { optimal: 0, degraded: 1, down: 2 };
@@ -1901,6 +1903,27 @@
       if (n.type === 'obstacle') {
         const r = Math.max(18, (num(n.props.widthKm, 2) / 2) / kmPerPx());
         el('circle', { class: 'obstacle-shape', r, cx: 0, cy: 0 }, g);
+        // Poignée d'emprise (largeur) sur le bord du disque
+        const wg = el('g', { class: 'height-handle width-handle', 'data-handle': n.id, 'data-hkind': 'width', transform: `translate(${r + 30} 0)` }, g);
+        el('rect', { class: 'hh-bg', x: -22, y: -9, width: 44, height: 18, rx: 9 }, wg);
+        el('path', { class: 'hh-arrow', d: 'M-26 -4 L-30 0 L-26 4 M26 -4 L30 0 L26 4' }, wg);
+        const wt = el('text', { class: 'hh-text', x: 0, y: 0 }, wg);
+        wt.textContent = fmt(num(n.props.widthKm, 2), num(n.props.widthKm, 2) < 1 ? 2 : 1) + ' km';
+        el('title', null, wg).textContent = 'Tirer vers la gauche ou la droite pour régler la largeur (emprise) de l’obstacle';
+      }
+      if (n.type === 'obstacle' || n.type === 'building') {
+        // Jauge et poignée de hauteur (obstacle : mètres ; immeuble : nombre d'étages)
+        const bld = n.type === 'building';
+        const val = bld ? num(n.props.floors, 8) : num(n.props.heightM, 60);
+        const base = -sz / 2;
+        const top = base - 6 - (bld ? val * FLOOR_PX : val * OBST_PX_PER_M);
+        el('line', { class: 'tower-mast obstacle-mast', x1: 0, y1: base, x2: 0, y2: top }, g);
+        const hg = el('g', { class: 'height-handle', 'data-handle': n.id, 'data-hkind': bld ? 'floors' : 'obst', transform: `translate(0 ${top})` }, g);
+        el('rect', { class: 'hh-bg', x: -19, y: -9, width: 38, height: 18, rx: 9 }, hg);
+        el('path', { class: 'hh-arrow', d: 'M-4 -12 L0 -16 L4 -12 M-4 12 L0 16 L4 12' }, hg);
+        const ht = el('text', { class: 'hh-text', x: 0, y: 0 }, hg);
+        ht.textContent = bld ? 'R+' + val : fmt(val, 0) + ' m';
+        el('title', null, hg).textContent = bld ? 'Tirer vers le haut ou le bas pour régler le nombre d’étages (R+0 à R+60)' : 'Tirer vers le haut ou le bas pour régler la hauteur de l’obstacle (5 à 400 m)';
       }
       if (n.type === 'blrBts') {
         const R = 130;
@@ -1930,7 +1953,9 @@
       }
       el('rect', { class: 'node-bg', x: -sz / 2, y: -sz / 2, width: sz, height: sz, rx: n.type === 'satellite' ? sz / 2 : 9 }, g);
       const ic = sz * 0.64;
-      el('use', { class: 'node-icon', href: '#' + iconId(n), x: -ic / 2, y: -ic / 2, width: ic, height: ic }, g);
+      const ico = el('use', { class: 'node-icon', href: '#' + iconId(n), x: -ic / 2, y: -ic / 2, width: ic, height: ic }, g);
+      const aim = aimTransform(n);
+      if (aim) ico.setAttribute('transform', aim);
       const t = el('text', { class: 'node-label', x: 0, y: sz / 2 + 13 }, g);
       t.textContent = n.name;
       const sub = nodeSubLabel(n);
@@ -2385,7 +2410,9 @@
         const n = nodeById(handle.dataset.handle);
         if (n && !S.locked) {
           pushHistory();
-          drag = { kind: 'height', node: n, sy: e.clientY, h0: num(n.props.heightM, 40), moved: false };
+          const hk = handle.dataset.hkind || 'tower';
+          const h0 = hk === 'floors' ? num(n.props.floors, 8) : hk === 'width' ? num(n.props.widthKm, 2) : num(n.props.heightM, hk === 'obst' ? 60 : 40);
+          drag = { kind: 'height', hk, node: n, sy: e.clientY, h0, moved: false };
           select({ kind: 'node', id: n.id });
           svg.classList.add('resizing');
           renderInspector();
@@ -2434,10 +2461,35 @@
         S.view.y = drag.vy + (e.clientY - drag.sy);
         applyView();
       } else if (drag.kind === 'height') {
-        const dv = (drag.sy - e.clientY) / (S.view.k * MAST_PX_PER_M);
-        const v = U.clamp(Math.round(drag.h0 + dv), TOWER_MIN_M, TOWER_MAX_M);
-        if (v !== num(drag.node.props.heightM)) {
-          setTowerHeight(drag.node, v);
+        const n = drag.node;
+        let changed = false;
+        if (drag.hk === 'width') {
+          const r = Math.max(0, Math.abs(w.x - n.x) - 30); // poignée placée 30 px hors du disque
+          const v = U.clamp(Math.round(2 * r * kmPerPx() * 20) / 20, 0.05, 20);
+          if (v !== num(n.props.widthKm)) {
+            n.props.widthKm = v;
+            changed = true;
+          }
+        } else if (drag.hk === 'obst') {
+          const v = U.clamp(Math.round(drag.h0 + (drag.sy - e.clientY) / (S.view.k * OBST_PX_PER_M)), 5, 400);
+          if (v !== num(n.props.heightM)) {
+            n.props.heightM = v;
+            changed = true;
+          }
+        } else if (drag.hk === 'floors') {
+          const v = U.clamp(Math.round(drag.h0 + (drag.sy - e.clientY) / (S.view.k * FLOOR_PX)), 0, 60);
+          if (v !== num(n.props.floors)) {
+            setBuildingFloors(n, v);
+            changed = true;
+          }
+        } else {
+          const v = U.clamp(Math.round(drag.h0 + (drag.sy - e.clientY) / (S.view.k * MAST_PX_PER_M)), TOWER_MIN_M, TOWER_MAX_M);
+          if (v !== num(n.props.heightM)) {
+            setTowerHeight(n, v);
+            changed = true;
+          }
+        }
+        if (changed) {
           drag.moved = true;
           scheduleUpdate({ keepInspector: true });
         }
@@ -2470,7 +2522,9 @@
     const end = (e) => {
       if (drag && drag.kind === 'height') {
         if (drag.moved) {
-          log(`Pylône « ${drag.node.name} » : hauteur ${fmt(drag.h0, 0)} m → ${fmt(num(drag.node.props.heightM), 0)} m.`, 'info');
+          const p = drag.node.props;
+          const msg = { width: `largeur ${fmt(drag.h0, 2)} → ${fmt(num(p.widthKm), 2)} km`, obst: `hauteur ${fmt(drag.h0, 0)} → ${fmt(num(p.heightM), 0)} m`, floors: `R+${drag.h0} → R+${num(p.floors)}`, tower: `hauteur ${fmt(drag.h0, 0)} m → ${fmt(num(p.heightM), 0)} m` }[drag.hk || 'tower'];
+          log(`${(CATALOG[drag.node.type] || {}).label || 'Élément'} « ${drag.node.name} » : ${msg}.`, 'info');
           update();
         } else S.history.pop(); // simple clic sur la poignée : rien à annuler
       }
@@ -3098,6 +3152,31 @@
       if (k.props.siteId === tower.id && k.props.heightM !== undefined && num(k.props.heightM) >= old - 2.01) k.props.heightM = Math.max(5, v - 2);
     }
     tower.props.heightM = v;
+  }
+  /** Nombre d'étages d'un immeuble : les équipements du toit suivent la terrasse. */
+  function setBuildingFloors(b, floors) {
+    const old = siteHeightM(b);
+    b.props.floors = U.clamp(Math.round(num(floors, 8)), 0, 60);
+    const dh = siteHeightM(b) - old;
+    for (const k of S.topo.nodes) if (k.props.siteId === b.id && k.props.heightM !== undefined && num(k.props.heightM) >= old - 0.01) k.props.heightM = Math.max(1, num(k.props.heightM) + dh);
+  }
+  /**
+   * Orientation de l'icône d'une antenne directive vers son correspondant (antenne FH ou Full-Outdoor
+   * vers l'autre extrémité du bond, CPE vers sa station de base) : l'icône « regarde » vers la droite ;
+   * vers la gauche, elle est retournée (miroir) plutôt que mise à l'envers.
+   */
+  function aimTransform(n) {
+    if (!['antenna', 'fullOutdoor', 'blrCpe'].includes(n.type)) return null;
+    const media = n.type === 'blrCpe' ? ['blr'] : ['fh'];
+    const peer = neighbors(n, media)[0];
+    if (!peer) return null;
+    const a = vpos(n);
+    const b = vpos(peer.node);
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    if (Math.hypot(dx, dy) < 1) return null;
+    const deg = (Math.atan2(dy, dx) * 180) / Math.PI;
+    return dx >= 0 ? `rotate(${deg.toFixed(1)})` : `rotate(${(deg - 180).toFixed(1)}) scale(-1 1)`;
   }
   /** Hauteur max de fixation d'un équipement selon son support. */
   function mountMaxHeight(n) {
