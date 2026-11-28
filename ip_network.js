@@ -60,12 +60,19 @@
     pc: 'endpoint',
     server: 'endpoint',
     internet: 'endpoint',
+    // Direct-to-Device / NTN
+    d2dSat: 'radio',
+    ntnGateway: 'bridge',
+    mobileCore: 'router',
+    ue: 'endpoint',
+    iotDevice: 'endpoint',
+    vehicle: 'endpoint',
   };
 
   /** Débit par défaut (Mbit/s) des supports filaires. */
   const WIRED_CAPACITY = { ethernet: 1000, fiber: 10000, if: 10000, coax: 10000 };
   /** Latence par défaut (ms) d'un lien selon le support (hors VSAT, fournie par le moteur satellite). */
-  const DEFAULT_LATENCY = { ethernet: 0.05, fiber: 0.1, if: 0.01, coax: 0.01, fh: 0.15, blr: 2.0, vsat: 120 };
+  const DEFAULT_LATENCY = { ethernet: 0.05, fiber: 0.1, if: 0.01, coax: 0.01, fh: 0.15, blr: 2.0, vsat: 120, d2d: 5, feeder: 3, cell: 10 };
   const NODE_LATENCY_MS = { router: 0.1, switch: 0.02, bridge: 0.05, radio: 0, endpoint: 0, passive: 0 };
   const QOS_PRIORITY = { voice: 0, video: 1, data: 2 };
   const QOS_LABEL = { voice: 'Voix (EF)', video: 'Vidéo (AF41)', data: 'Données (BE)' };
@@ -169,6 +176,12 @@
         this.adj.get(l.a).push({ link: l, other: l.b });
         this.adj.get(l.b).push({ link: l, other: l.a });
       }
+      // Une BTS/gNodeB qui sert des terminaux mobiles (lien « cell ») relaie leur trafic vers le cœur
+      this.cellSites = new Set();
+      for (const l of this.links.values()) {
+        if (l.medium !== 'cell') continue;
+        for (const id of [l.a, l.b]) if (this.nodes.get(id).type === 'gnodeb') this.cellSites.add(id);
+      }
       this.blockedLinks = new Set(); // RPL bloqués par ERPS
       this.stormNodes = new Set(); // nœuds pris dans une boucle L2 non protégée
       this.rings = [];
@@ -180,6 +193,7 @@
     role(nodeOrId) {
       const n = typeof nodeOrId === 'string' ? this.nodes.get(nodeOrId) : nodeOrId;
       if (!n) return 'passive';
+      if (this.cellSites && this.cellSites.has(n.id)) return 'bridge';
       return ROLE_BY_TYPE[n.type] || 'passive';
     }
     props(id) {
@@ -594,7 +608,10 @@
           labels.push(16 + ((flowIndex + 1) * 1000 + (li + 1) * 100 + (i + 1) * 11) % 1048560);
         }
         routers.forEach((r, i) => {
-          if (i === 0) ops.push({ node: r, op: 'PUSH', label: labels[0], text: `${this.name(r)} (PE d’entrée) : PUSH label ${labels[0]}` });
+          if (i === 0 && routers.length === 2)
+            // PE de sortie adjacent : il annonce le label implicit-null, rien n'est empilé (PHP)
+            ops.push({ node: r, op: 'PUSH', label: null, text: `${this.name(r)} (PE d’entrée) : aucun label de transport empilé (PE de sortie adjacent, implicit-null / PHP)` });
+          else if (i === 0) ops.push({ node: r, op: 'PUSH', label: labels[0], text: `${this.name(r)} (PE d’entrée) : PUSH label ${labels[0]}` });
           else if (i === routers.length - 1) ops.push({ node: r, op: 'POP', label: null, text: `${this.name(r)} (PE de sortie) : reçoit le paquet IP/trame sans label` });
           else if (i === routers.length - 2) ops.push({ node: r, op: 'PHP', label: labels[i - 1], text: `${this.name(r)} (P, avant-dernier saut) : POP label ${labels[i - 1]} (PHP)` });
           else ops.push({ node: r, op: 'SWAP', label: labels[i], text: `${this.name(r)} (P) : SWAP ${labels[i - 1]} → ${labels[i]}` });

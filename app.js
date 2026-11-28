@@ -59,8 +59,12 @@
   const STATUS_RANK = { optimal: 0, degraded: 1, down: 2 };
   const SITE_TYPES = ['tower', 'building', 'obstacle'];
   const MOUNTABLE = ['antenna', 'odu', 'fullOutdoor', 'blrBts', 'blrCpe', 'vsatAntenna', 'buc', 'lnb'];
-  const ENDPOINT_TYPES = ['gnodeb', 'ruralSite', 'bankAgency', 'pc', 'server', 'internet'];
-  const RADIO_MEDIA = ['fh', 'blr', 'vsat'];
+  const D2D_TERMINALS = ['ue', 'iotDevice', 'vehicle'];
+  const ENDPOINT_TYPES = ['gnodeb', 'ruralSite', 'bankAgency', 'pc', 'server', 'internet'].concat(D2D_TERMINALS);
+  const RADIO_MEDIA = ['fh', 'blr', 'vsat', 'd2d', 'feeder', 'cell'];
+  const D2 = MBV.D2D;
+  /** Niveau d'affichage des calculs (Bac Pro, Licence, Master / ingénieur). */
+  const LEVEL_RANK = { bac: 0, licence: 1, master: 2 };
 
   const CATALOG = {
     tower: { label: 'Pylône', cat: 'site', size: 48, defaults: { groundM: 300, heightM: 40 } },
@@ -100,12 +104,19 @@
     vsatModem: { label: 'Modem VSAT', cat: 'vsat', size: 40, defaults: { retSymbolRate: 2, retMaxModcod: '8PSK 3/4', acm: true, accessVlan: 0, vlans: 'all' } },
     router: { label: 'Routeur', cat: 'ip', size: 44, defaults: { loopback: '', mpls: true, frr: true, interVlan: true, vlans: 'all' } },
     switch: { label: 'Switch', cat: 'ip', size: 42, defaults: { vlans: 'all', erps: false, rplOwner: false, l3: false } },
-    gnodeb: { label: 'BTS/gNodeB', cat: 'ip', size: 42, defaults: { ip: '', prefix: 24, gateway: '', vlan: 0 } },
+    gnodeb: { label: 'BTS/gNodeB', cat: 'ip', size: 42, defaults: { ip: '', prefix: 24, gateway: '', vlan: 0, cellBand: 'B20', cellTxDbm: 46, cellGainDbi: 17, cellHeightM: 30, cellChannelMHz: 10, terrain: 'rural' } },
     ruralSite: { label: 'Site rural', cat: 'ip', size: 42, defaults: { ip: '', prefix: 24, gateway: '', vlan: 0 } },
     bankAgency: { label: 'Agence', cat: 'ip', size: 42, defaults: { ip: '', prefix: 24, gateway: '', vlan: 0 } },
     pc: { label: 'PC', cat: 'ip', size: 38, defaults: { ip: '', prefix: 24, gateway: '', vlan: 0 } },
     server: { label: 'Serveur', cat: 'ip', size: 40, defaults: { ip: '', prefix: 24, gateway: '', vlan: 0 } },
     internet: { label: 'Internet', cat: 'ip', size: 46, defaults: { ip: '', prefix: 24, gateway: '', vlan: 0 } },
+    // Direct-to-Device / NTN
+    d2dSat: { label: 'Satellite D2D', cat: 'd2d', size: 46, defaults: { profile: 'D2C_LTE', band: '', channelMHz: 0, beamPowerW: 0, reuse: 0, elevationDeg: 50, motion: 'fixed', satsPerPlane: 0, passMaxElevDeg: 80, satsTotal: 0, backgroundUsers: 30 } },
+    ntnGateway: { label: 'Station sol NTN', cat: 'd2d', size: 44, defaults: { groundM: 300, localRain: false, vlans: 'all' } },
+    mobileCore: { label: 'Cœur mobile', cat: 'd2d', size: 46, defaults: { loopback: '', mpls: false, frr: false, interVlan: true, vlans: 'all', ntnAgreement: true, thresholdDbm: -115 } },
+    ue: { label: 'Smartphone', cat: 'd2d', size: 38, defaults: { ip: '', prefix: 24, gateway: '', vlan: 0, terminal: 'smartphone', environment: 'exterieur', los: true, beamPos: 0.5, ulRb: 0, ntnChip: false, simNtn: true, coordMode: 'plan', lat: REF.lat, lon: REF.lon, motion: 'fixed', routeKm: 50, routeHeadingDeg: 90, speedKmh: 90 } },
+    iotDevice: { label: 'Capteur IoT', cat: 'd2d', size: 36, defaults: { ip: '', prefix: 24, gateway: '', vlan: 0, environment: 'exterieur', los: true, beamPos: 0.5, ulTonesKHz: 3.75, ntnChip: true, simNtn: true, reportsPerDay: 24, payloadBytes: 50, capacityMAh: 5000, gnssFixS: 5, rai: true, ephemerisAgeS: 60, coordMode: 'plan', lat: REF.lat, lon: REF.lon } },
+    vehicle: { label: 'Véhicule', cat: 'd2d', size: 40, defaults: { ip: '', prefix: 24, gateway: '', vlan: 0, antenna: 'toit', los: true, beamPos: 0.5, ulRb: 0, ntnChip: false, simNtn: true, coordMode: 'plan', lat: REF.lat, lon: REF.lon, motion: 'fixed', routeKm: 50, routeHeadingDeg: 90, speedKmh: 90 } },
   };
 
   const MEDIUM_LABEL = {
@@ -116,6 +127,9 @@
     fh: 'Faisceau hertzien',
     blr: 'Liaison BLR (PMP)',
     vsat: 'Liaison satellite',
+    d2d: 'Liaison directe satellite ↔ terminal (NTN)',
+    feeder: 'Liaison de connexion satellite ↔ station sol (feeder)',
+    cell: 'Accès radio terrestre 4G (cellule)',
   };
   const CLS_LABEL = { voice: 'Voix', video: 'Vidéo', data: 'Données' };
 
@@ -248,7 +262,26 @@
     return n && n.props && n.props.siteId ? nodeById(n.props.siteId) : null;
   }
   function anchorOf(n) {
-    return siteOf(n) || n;
+    return siteOf(n) || (onRoute(n) ? routePos(n) : n);
+  }
+  /** Terminal mobile qui suit un trajet (aller-retour) au rythme de l'horloge de simulation. */
+  const onRoute = (n) => !!n && D2D_TERMINALS.includes(n.type) && n.props && n.props.motion === 'route' && num(n.props.routeKm, 0) > 0;
+  function routeKmAt(n, t = S.sim.t) {
+    const L = num(n.props.routeKm, 0);
+    const d = (Math.max(0, num(n.props.speedKmh, 60)) * t) / 3600;
+    const m = d % (2 * L);
+    return { s: m <= L ? m : 2 * L - m, back: m > L, L };
+  }
+  function routePos(n, t) {
+    const r = routeKmAt(n, t);
+    const hd = U.deg2rad(num(n.props.routeHeadingDeg, 90));
+    const px = r.s / kmPerPx();
+    return { id: n.id, type: n.type, name: n.name, props: n.props, x: n.x + px * Math.sin(hd), y: Math.max(GROUND_MIN_Y, n.y - px * Math.cos(hd)) };
+  }
+  function routeEnd(n) {
+    const hd = U.deg2rad(num(n.props.routeHeadingDeg, 90));
+    const px = num(n.props.routeKm, 0) / kmPerPx();
+    return { x: n.x + px * Math.sin(hd), y: Math.max(GROUND_MIN_Y, n.y - px * Math.cos(hd)) };
   }
   function siteHeightM(site) {
     if (!site) return 0;
@@ -318,6 +351,21 @@
     if (pair('blrBts', 'blrCpe')) return { medium: 'blr' };
     if (pair('blrBts', 'blrBts')) return { error: 'Une liaison BLR relie une station de base BLR à un terminal abonné (CPE).' };
     if (pair('blrCpe', 'blrCpe')) return { error: 'Deux CPE ne communiquent pas directement : chacun vise la station de base BLR.' };
+    if (has('d2dSat')) {
+      const other = ta === 'd2dSat' ? nb : na;
+      if (D2D_TERMINALS.includes(other.type)) return { medium: 'd2d' };
+      if (other.type === 'ntnGateway') return { medium: 'feeder' };
+      if (other.type === 'd2dSat' || other.type === 'satellite') return { error: 'Les liaisons inter-satellites ne sont pas simulées : chaque satellite descend vers une station sol NTN.' };
+      return { error: 'Un satellite Direct-to-Device dessert des terminaux (smartphone, capteur IoT, véhicule) et se raccorde à une station sol NTN (liaison de connexion).' };
+    }
+    if (D2D_TERMINALS.includes(ta) || D2D_TERMINALS.includes(tb)) {
+      const other = D2D_TERMINALS.includes(ta) ? nb : na;
+      if (other.type === 'gnodeb') return { medium: 'cell' };
+      if (D2D_TERMINALS.includes(other.type)) return { error: 'Deux terminaux mobiles ne communiquent pas directement : chacun passe par une cellule (BTS terrestre ou satellite D2D).' };
+      if (other.type === 'satellite') return { error: 'Un satellite VSAT demande une parabole et un modem : un terminal mobile se rattache à un « Satellite D2D ».' };
+      return { error: 'Un terminal mobile se rattache par radio : à une BTS / gNodeB terrestre (accès 4G) ou à un satellite D2D (liaison directe).' };
+    }
+    if (pair('ntnGateway', 'satellite')) return { error: 'La station sol NTN dialogue avec un « Satellite D2D », pas avec un satellite VSAT.' };
     if (has('satellite')) {
       const other = ta === 'satellite' ? nb : na;
       if (other.type === 'vsatAntenna' || other.type === 'hub') return { medium: 'vsat' };
@@ -1094,10 +1142,14 @@
   }
   /** Position affichée d'un équipement (un satellite défilant est décalé le long de son orbite). */
   function vpos(n) {
-    return n.type === 'satellite' && S.satVis[n.id] ? { x: n.x + S.satVis[n.id], y: n.y } : { x: n.x, y: n.y };
+    if (onRoute(n)) {
+      const r = routePos(n);
+      return { x: r.x, y: r.y };
+    }
+    return (n.type === 'satellite' || n.type === 'd2dSat') && S.satVis[n.id] ? { x: n.x + S.satVis[n.id], y: n.y } : { x: n.x, y: n.y };
   }
   function hasMovingSat() {
-    return S.topo.nodes.some((n) => n.type === 'satellite' && n.props.orbit !== 'GEO' && n.props.motion === 'moving');
+    return S.topo.nodes.some((n) => onRoute(n) || (n.type === 'satellite' && n.props.orbit !== 'GEO' && n.props.motion === 'moving') || (n.type === 'd2dSat' && n.props.motion === 'moving' && D2.getProfile(n.props.profile).orbit !== 'GEO'));
   }
   function setClock(playing) {
     S.sim.playing = playing;
@@ -1158,6 +1210,16 @@
       vsatOf,
       vsatOfCable: (l) => [nodeById(l.a), nodeById(l.b)].filter(Boolean).map(vsatOf).find(Boolean) || null,
       blrLinkOf: (o) => radioLinksOf(o).find((l) => l.medium === 'blr') || null,
+      // Direct-to-Device
+      cellLinksOf: (o) => radioLinksOf(o).filter((l) => l.medium === 'cell'),
+      feedersOf: (o) => radioLinksOf(o).filter((l) => l.medium === 'feeder'),
+      accessLinksOf: (o) => radioLinksOf(o).filter((l) => l.medium === 'd2d' || l.medium === 'cell'),
+      satLinksOf: (o) => radioLinksOf(o).filter((l) => l.medium === 'd2d'),
+      hasD2d: () => S.topo.links.some((l) => l.medium === 'd2d'),
+      hasCellAndSat: () => S.topo.nodes.some((t) => isD2dTerm(t) && radioLinksOf(t).some((l) => l.medium === 'cell') && radioLinksOf(t).some((l) => l.medium === 'd2d')),
+      ntnChip: (o) => ntnChip(o),
+      needsNtn: (o) => radioLinksOf(o).some((l) => l.medium === 'd2d' && d2dProfileOf(nodeById(l.a === o.id ? l.b : l.a)).precomp === 'gnss'),
+      onLeo: (o) => radioLinksOf(o).some((l) => l.medium === 'd2d' && d2dProfileOf(nodeById(l.a === o.id ? l.b : l.a)).orbit !== 'GEO'),
     };
   }
   /** Signature de l'état du réseau (flux en service, état des liaisons radio) pour juger l'effet d'une panne. */
@@ -1223,6 +1285,7 @@
       return c.fhLinkOfCable(o) || (c.vsatOfCable(o) || {}).link || o;
     }
     const c = faultCtx();
+    if (isD2dTerm(o) || ['gnodeb', 'ntnGateway', 'd2dSat'].includes(o.type)) return primaryRadioLink(o);
     return fhLinkOfNode(o) || (c.vsatOf(o) || {}).link || c.blrLinkOf(o) || null;
   }
   /** Mesure enregistrée : bilan ou profil d'une liaison ouvert. */
@@ -1287,6 +1350,16 @@
     if (n.type === 'vsatModem' && hop && hop.state) {
       leds.push({ label: 'Rx (verrouillage)', cls: hop.state.fwdCap > 0 ? 'on' : 'err' });
       leds.push({ label: 'Tx', cls: hop.state.retCap > 0 ? 'on' : 'err' });
+    }
+    if (isD2dTerm(n)) {
+      const a = links.find((l) => (l.medium === 'd2d' || l.medium === 'cell') && l.state && l.state.up);
+      leds.push({ label: a ? (a.medium === 'd2d' ? 'Réseau SAT' : 'Réseau 4G') : 'Aucun réseau', cls: a ? (a.state.status === 'optimal' ? 'on' : 'warn') : 'err' });
+    }
+    if (n.type === 'gnodeb' && links.some((l) => l.medium === 'cell')) leds.push({ label: 'Émission cellule', cls: hw(n).cellOff ? 'err' : 'on' });
+    if (n.type === 'ntnGateway') {
+      const fd = links.filter((l) => l.medium === 'feeder');
+      const up = fd.filter((l) => l.state && l.state.up);
+      if (fd.length) leds.push({ label: 'Poursuite satellite', cls: up.length === fd.length ? (up.every((l) => l.state.status === 'optimal') ? 'on' : 'warn') : 'err' });
     }
     const wired = links.filter((l) => ['ethernet', 'fiber'].includes(l.medium));
     if (wired.length) {
@@ -1357,6 +1430,10 @@
       } else if (l.medium === 'blr' && st.budgets) {
         add(l, 'dl', `RSL reçu au CPE ${st.cpe.name}`, 'dBm', st.budgets.dl.rslCalc, st.up ? st.budgets.dl.rsl : null);
         add(l, 'ul', `RSL reçu à la BTS ${st.bts.name}`, 'dBm', st.budgets.ul.rslCalc, st.up ? st.budgets.ul.rsl : null);
+      } else if (l.medium === 'd2d' && st.up && st.result) {
+        add(l, 'dl', `RSRP satellite au terminal ${st.term.name}`, 'dBm', (st.result.design || st.result).dl.rsrpDbm, st.result.dl.rsrpDbm);
+      } else if (l.medium === 'cell' && st.up && st.cell) {
+        add(l, 'dl', `RSRP terrestre au terminal ${st.term.name}`, 'dBm', (st.cell.design || st.cell).rsrp, st.cell.rsrp);
       } else if (l.medium === 'vsat' && st.role === 'remote' && st.measure) {
         add(l, 'fwd', `Es/N0 voie aller au modem${st.chain && st.chain.modem ? ' ' + st.chain.modem.name : ''}`, 'dB', st.measure.fwdEsn0Calc, st.up ? st.measure.fwdEsn0 : null);
       }
@@ -1487,6 +1564,253 @@
     return { kind: link.medium, up: true, status: 'optimal', capacityMbps: cap, latencyMs: NET.DEFAULT_LATENCY[link.medium] || 0.05, issues: [] };
   }
 
+  /* --- Direct-to-Device (NTN) : terminaux mobiles, satellites D2D, cellules terrestres --- */
+  const D2D_MEDIA = ['d2d', 'feeder', 'cell'];
+  const isD2dTerm = (n) => !!n && D2D_TERMINALS.includes(n.type);
+  const d2dProfileOf = (sat) => D2.getProfile(sat.props.profile);
+  /** Satellites par plan orbital par défaut : continu (D2C), clairsemé (grandes antennes, IoT LEO). */
+  const d2dDefaultSats = (prof) => (prof.id === 'D2C_LTE' ? 28 : prof.id === 'D2D_BB' ? 2 : 1);
+  function d2dConstellation(sat, t) {
+    const prof = d2dProfileOf(sat);
+    return SP.constellationState('LEO', t, {
+      altitudeKm: prof.altitudeKm,
+      satsPerPlane: num(sat.props.satsPerPlane, 0) || d2dDefaultSats(prof),
+      maxElevationDeg: num(sat.props.passMaxElevDeg, 80),
+      minElevationDeg: prof.minElevationDeg,
+    });
+  }
+  const d2dMoving = (sat) => sat.props.motion === 'moving' && d2dProfileOf(sat).orbit !== 'GEO';
+  /** Paramètres radio d'un terminal pour le moteur D2D. */
+  function d2dTermParams(t, prof) {
+    const p = t.props;
+    const tech = prof.tech === 'NB-IoT' ? 'NB-IoT' : t.type === 'iotDevice' ? 'LTE-M' : prof.tech;
+    const base = { tech, los: p.los !== false, beamPos: U.clamp(num(p.beamPos, 0.5), 0, 1.5) };
+    if (t.type === 'iotDevice') return Object.assign(base, { terminal: 'iot', environment: p.environment || 'exterieur', ulTonesKHz: num(p.ulTonesKHz, 3.75), ulRb: 1, ephemerisAgeS: num(p.ephemerisAgeS, 60) });
+    if (t.type === 'vehicle') return Object.assign(base, p.antenna === 'interieur' ? { terminal: 'smartphone', environment: 'vehicule' } : { terminal: 'vehicle', environment: 'exterieur' }, { ulRb: num(p.ulRb, 0) || 1 });
+    return Object.assign(base, { terminal: p.terminal || 'smartphone', environment: p.environment || 'exterieur', ulRb: num(p.ulRb, 0) || 1 });
+  }
+  /** Le terminal possède-t-il une puce NTN 3GPP (Rel-17) ? */
+  const ntnChip = (t) => (t.props.ntnChip !== undefined ? !!t.props.ntnChip : t.type === 'iotDevice');
+  /** Parcours des liens en service (hors accès radio des terminaux) depuis un équipement. */
+  function reachUp(start, accept) {
+    const seen = new Set([start.id]);
+    const queue = [start];
+    while (queue.length) {
+      const u = queue.shift();
+      for (const l of S.topo.links) {
+        if (l.medium === 'd2d' || l.medium === 'cell' || l.medium === 'mount') continue;
+        if (l.a !== u.id && l.b !== u.id) continue;
+        if (!l.state || !l.state.up) continue;
+        const o = nodeById(l.a === u.id ? l.b : l.a);
+        if (!o || seen.has(o.id) || isDead(o)) continue;
+        if (accept(o)) return o;
+        seen.add(o.id);
+        queue.push(o);
+      }
+    }
+    return null;
+  }
+  /** Cœur mobile joignable (EPC / 5GC) ; à défaut d'un cœur dans le projet, un routeur ou Internet. */
+  function coreFrom(n) {
+    const hasCore = S.topo.nodes.some((x) => x.type === 'mobileCore');
+    return reachUp(n, (o) => (hasCore ? o.type === 'mobileCore' : ['router', 'internet', 'server'].includes(o.type)));
+  }
+  function d2dCut(l, st) {
+    if (!(l.props && l.props.cut)) return st;
+    const c = Object.assign({}, st, { up: false, status: 'down', standby: false, capacityMbps: 0, capacityDir: { ab: 0, ba: 0 }, cut: true, label: 'COUPÉ' });
+    c.issues = [{ level: 'error', text: 'Lien coupé manuellement (mode Diagnostic).' }].concat(st.issues || []);
+    return c;
+  }
+  /** Capacité orientée d'un lien terminal ↔ réseau : ab = de l.a vers l.b. */
+  const dirCap = (l, term, upMbps, downMbps) => (l.a === term.id ? { ab: upMbps, ba: downMbps } : { ab: downMbps, ba: upMbps });
+
+  /** Liaisons de connexion (feeder) satellite D2D ↔ station sol. */
+  function computeFeeders() {
+    for (const l of S.topo.links.filter((x) => x.medium === 'feeder')) {
+      const sat = [nodeById(l.a), nodeById(l.b)].find((n) => n && n.type === 'd2dSat');
+      const gw = [nodeById(l.a), nodeById(l.b)].find((n) => n && n.type === 'ntnGateway');
+      if (!sat || !gw) {
+        l.state = downState('feeder', [{ level: 'error', text: 'Liaison de connexion incomplète.' }]);
+        continue;
+      }
+      const prof = d2dProfileOf(sat);
+      const fb = SP.getBand(prof.feederBand || 'Ka');
+      const elev = prof.gatewayElevationDeg || 40;
+      const r = gw.props.localRain ? rain() : 0;
+      const ar = SP.slantRainAttenuation(fb.downGHz, r, elev, num(gw.props.groundM, 300) / 1000, fb.polarization);
+      const gwLoss = hw(gw).extraLossDb || 0; // panne cachée : jamais nommée
+      const cn = (prof.feederCnDb || 22) - ar.total - gwLoss;
+      const slant = prof.orbit === 'GEO' ? SP.slantRangeFromElevationKm(prof.altitudeKm, elev) : SP.slantRangeFromElevationKm(prof.altitudeKm, elev);
+      const issues = [];
+      let st;
+      const rainTxt = r > 0 ? ` (pluie ${fmt(r, 0)} mm/h sur la station sol, −${fmt(ar.total, 1)} dB en bande ${fb.id})` : '';
+      if (isDead(sat) || isDead(gw)) {
+        const shown = [sat, gw].filter((x) => failed(x)).map((x) => x.name);
+        const rev = [sat, gw].map(revealedIssue).find(Boolean);
+        st = downState('feeder', [rev || { level: 'error', text: shown.length ? 'Équipement hors service : ' + shown.join(', ') + '.' : 'Liaison de connexion : aucun signal reçu de la station sol.' }], { cnDb: cn, rainDb: ar.total, sat, gw, label: 'COUPÉ' });
+      } else if (cn < 3) st = downState('feeder', [{ level: 'error', text: `Liaison de connexion coupée : C/N ${fmt(cn, 1)} dB${rainTxt}.` }], { cnDb: cn, rainDb: ar.total, sat, gw, label: 'COUPÉ' });
+      else {
+        if (cn < 10) issues.push({ level: 'warn', text: `Liaison de connexion dégradée : C/N ${fmt(cn, 1)} dB${rainTxt}${prof.payload === 'transparent' ? ' ; tous les terminaux du satellite en souffrent (charge utile transparente).' : ' ; le débit vers le cœur baisse.'}` });
+        st = { kind: 'feeder', up: true, status: cn < 10 ? 'degraded' : 'optimal', capacityMbps: cn < 10 ? 200 : 1000, latencyMs: slant / C_KM_MS, cnDb: cn, rainDb: ar.total, band: fb, sat, gw, issues, label: `Feeder ${fb.id} · C/N ${fmt(cn, 1)} dB` };
+      }
+      l.state = d2dCut(l, st);
+    }
+  }
+
+  /** Géométrie commune d'un satellite D2D à l'instant de simulation (LEO figé ou défilant). */
+  function d2dSatGeometry(sat) {
+    const prof = d2dProfileOf(sat);
+    if (prof.orbit === 'GEO') return { prof, el: null, moving: false };
+    if (!d2dMoving(sat)) return { prof, el: U.clamp(num(sat.props.elevationDeg, 50), 0, 90), moving: false };
+    const cs = d2dConstellation(sat, S.sim.t);
+    trackServing(sat, cs);
+    return { prof, el: cs.serving ? cs.serving.el : 0, moving: true, cs };
+  }
+
+  /** Bilan satellite d'un terminal relié à un satellite D2D (sans arbitrage d'accès). */
+  function d2dBudget(t, sat, g) {
+    const prof = g.prof;
+    const tp = d2dTermParams(t, prof);
+    const sp = sat.props;
+    // Diversité de stations sol : le satellite descend vers une station sol dont le feeder est en service
+    const feeders = S.topo.links.filter((l) => l.medium === 'feeder' && (l.a === sat.id || l.b === sat.id));
+    const gwLink = feeders.find((l) => l.state && l.state.up && coreFrom(nodeById(l.a === sat.id ? l.b : l.a))) || feeders.find((l) => l.state && l.state.up) || feeders[0] || null;
+    const gw = gwLink ? nodeById(gwLink.a === sat.id ? gwLink.b : gwLink.a) : null;
+    const geo = geoOf(t);
+    const p = Object.assign({}, tp, {
+      profile: prof.id,
+      band: sp.band || prof.band,
+      channelMHz: num(sp.channelMHz, 0) || prof.channelMHz,
+      beamPowerW: num(sp.beamPowerW, 0) || prof.beamPowerW,
+      reuse: num(sp.reuse, 0) || prof.reuse,
+      elevationDeg: g.el,
+      latDeg: geo.lat,
+      lonDeg: geo.lon,
+      gatewayRainMmH: gw && gw.props.localRain ? rain() : 0,
+    });
+    if (prof.precomp === 'gnss') p.ntnCapable = true;
+    // Pertes cachées (panne matérielle du terminal) et écart de recette : symptômes seulement
+    const link = S.topo.links.find((l) => l.medium === 'd2d' && ((l.a === t.id && l.b === sat.id) || (l.b === t.id && l.a === sat.id)));
+    const hidden = (hw(t).extraLossDb || 0) - (link ? recetteDelta(link, sat, t, 'dl') : 0);
+    if (hidden) p.hiddenLossDb = hidden;
+    const res = D2.computeD2DLink(p);
+    if (hidden) res.design = D2.computeD2DLink(Object.assign({}, p, { hiddenLossDb: 0 }));
+    if (g.moving && g.cs.serving) res.instDopplerKHz = SP.dopplerKHz(res.band.ulMHz / 1000, g.cs.serving.rangeRateKmS);
+    return { res, prof, gwLink, params: p };
+  }
+
+  /** Arbitrage terrestre / satellite de chaque terminal, puis états des liens d2d et cell. */
+  function computeD2d() {
+    const satGeo = new Map();
+    for (const sat of S.topo.nodes.filter((n) => n.type === 'd2dSat')) satGeo.set(sat.id, d2dSatGeometry(sat));
+    const decisions = [];
+    for (const t of S.topo.nodes.filter(isD2dTerm)) {
+      if (isDead(t)) {
+        const rev = revealedIssue(t);
+        const txt = failed(t) ? 'Terminal en panne (simulée).' : rev ? rev.text : 'Le terminal n’affiche aucun réseau.';
+        for (const l of radioLinksOf(t).filter((x) => x.medium === 'd2d' || x.medium === 'cell')) l.state = d2dCut(l, downState(l.medium, [{ level: 'error', text: txt }], { term: t, label: 'pas de service' }));
+        continue;
+      }
+      const cells = [];
+      for (const l of S.topo.links.filter((x) => x.medium === 'cell' && (x.a === t.id || x.b === t.id))) {
+        const bts = nodeById(l.a === t.id ? l.b : l.a);
+        const bp = bts.props;
+        const tp = d2dTermParams(t, { tech: 'LTE' });
+        const cellP = { band: bp.cellBand || 'B20', txDbm: num(bp.cellTxDbm, 46), gainDbi: num(bp.cellGainDbi, 17), hbM: num(bp.cellHeightM, 30), channelMHz: num(bp.cellChannelMHz, 10), terrain: bp.terrain || 'rural', dKm: distKm(t, bts), terminal: tp.terminal, environment: tp.environment, thresholdDbm: coreThreshold() };
+        const hidC = (hw(bts).extraLossDb || 0) + (hw(t).extraLossDb || 0) - recetteDelta(l, bts, t, 'dl');
+        const cell = D2.terrestrialCell(Object.assign({}, cellP, { hiddenLossDb: hidC }));
+        if (hidC) cell.design = D2.terrestrialCell(cellP);
+        const reasons = [];
+        const rev = revealedIssue(bts);
+        if (failed(bts)) reasons.push('station de base hors service');
+        else if (isDead(bts) || hw(bts).cellOff) reasons.push(rev ? rev.text.replace(/\.$/, '') : 'aucun signal reçu de cette cellule');
+        else if (!coreFrom(bts)) reasons.push('station de base sans transmission vers le cœur (cellule hors antenne)');
+        if (l.props && l.props.cut) reasons.push('lien coupé');
+        cells.push({ l, bts, cell, onAir: !reasons.length, reasons });
+      }
+      const sats = [];
+      for (const l of S.topo.links.filter((x) => x.medium === 'd2d' && (x.a === t.id || x.b === t.id))) {
+        const sat = nodeById(l.a === t.id ? l.b : l.a);
+        const g = satGeo.get(sat.id);
+        const b = d2dBudget(t, sat, g);
+        const reasons = [];
+        const compatible = !(b.prof.precomp === 'gnss' && !ntnChip(t));
+        const core = !isDead(sat) && b.gwLink && b.gwLink.state && b.gwLink.state.up ? coreFrom(sat) : null;
+        if (isDead(sat)) reasons.push('satellite hors service');
+        else if (!b.gwLink) reasons.push('satellite sans liaison de connexion vers une station sol NTN');
+        else if (!b.gwLink.state.up) reasons.push('liaison de connexion vers la station sol hors service');
+        else if (!core) reasons.push('aucun cœur mobile joignable derrière la station sol');
+        if (l.props && l.props.cut) reasons.push('lien coupé');
+        const subscriptionOk = t.props.simNtn !== false && !(core && core.type === 'mobileCore' && core.props.ntnAgreement === false);
+        sats.push({ l, sat, b, radioOk: b.res.ok, ok: b.res.ok && !reasons.length, compatible, subscriptionOk, reasons, core });
+      }
+      const bestCell = cells.filter((c) => c.onAir).sort((x, y) => y.cell.rsrp - x.cell.rsrp)[0] || null;
+      const bestSat = sats.filter((s) => s.ok && s.compatible && s.subscriptionOk).sort((x, y) => y.b.res.dl.sinrDb - x.b.res.dl.sinrDb)[0] || sats.filter((s) => s.ok).sort((x, y) => y.b.res.dl.sinrDb - x.b.res.dl.sinrDb)[0] || null;
+      const acc = D2.selectAccess({
+        terrestrialRsrpDbm: bestCell ? bestCell.cell.rsrp : null,
+        thresholdDbm: coreThreshold(),
+        satelliteOk: !!bestSat,
+        terminalCompatible: bestSat ? bestSat.compatible : true,
+        subscriptionOk: bestSat ? bestSat.subscriptionOk : true,
+      });
+      decisions.push({ t, cells, sats, bestCell, bestSat, acc });
+    }
+    // Charge des satellites : terminaux rattachés + abonnés simulés du faisceau
+    const load = new Map();
+    for (const d of decisions) if (d.acc.access === 'satellite') load.set(d.bestSat.sat.id, (load.get(d.bestSat.sat.id) || 0) + 1);
+    for (const d of decisions) {
+      const t = d.t;
+      for (const c of d.cells) {
+        const chosen = d.acc.access === 'terrestre' && c === d.bestCell;
+        const issues = c.reasons.map((r) => ({ level: 'error', text: r.charAt(0).toUpperCase() + r.slice(1) + '.' }));
+        let st;
+        if (chosen) {
+          const dl = c.cell.rate.kbps / 1000;
+          st = { kind: 'cell', up: true, status: c.cell.rsrp >= -100 ? 'optimal' : 'degraded', capacityMbps: dl, capacityDir: dirCap(c.l, t, dl / 3, dl), latencyMs: 10, cell: c.cell, bts: c.bts, term: t, access: d.acc, issues, label: `4G · ${fmt(c.cell.rsrp, 0)} dBm` };
+        } else {
+          if (c.onAir && c.cell.rsrp < coreThreshold()) issues.push({ level: 'warn', text: `Couverture terrestre insuffisante (RSRP ${fmt(c.cell.rsrp, 0)} dBm < ${fmt(coreThreshold(), 0)} dBm).` });
+          const standby = c.onAir && d.acc.access !== 'aucun' && c.cell.rsrp >= coreThreshold() - 20;
+          st = downState('cell', issues, { cell: c.cell, bts: c.bts, term: t, access: d.acc, standby, label: c.onAir ? (standby ? 'veille' : 'hors couverture') : 'hors service' });
+        }
+        c.l.state = d2dCut(c.l, st);
+      }
+      for (const s of d.sats) {
+        const chosen = d.acc.access === 'satellite' && s === d.bestSat;
+        const res = s.b.res;
+        const issues = s.reasons.map((r) => ({ level: 'error', text: r.charAt(0).toUpperCase() + r.slice(1) + '.' })).concat(res.messages.map((m) => ({ level: m.level === 'err' ? 'error' : m.level, text: m.text })));
+        if (!s.compatible) issues.push({ level: 'error', text: 'Aucune cellule utilisable : ce système satellite demande un terminal équipé d’une puce NTN (3GPP Rel-17).' });
+        else if (!s.subscriptionOk && s.ok) issues.push({ level: 'error', text: 'Cellule satellite détectée mais inscription refusée : appels d’urgence seulement.' });
+        const users = (load.get(s.sat.id) || 0) + Math.max(0, num(s.sat.props.backgroundUsers, 30));
+        const cov = D2.coverage({ profile: s.b.prof.id, satsTotal: num(s.sat.props.satsTotal, 0) || undefined });
+        const services = D2.services(res, { activeUsers: Math.max(1, users), coverage: d2dMoving(s.sat) ? null : cov });
+        const extra = { result: res, sat: s.sat, term: t, prof: s.b.prof, access: d.acc, services, users, coverage: cov, gwLink: s.b.gwLink };
+        let st;
+        if (chosen) {
+          const dl = res.dl.rate.kbps / 1000 / Math.max(1, users);
+          const ul = res.ul.best.kbps / 1000 / Math.max(1, Math.ceil(users / 4));
+          const voice = services.find((x) => x.id === 'voix');
+          const status = voice && voice.state === 'ok' ? 'optimal' : 'degraded';
+          st = Object.assign({ kind: 'd2d', up: true, status, standby: false, capacityMbps: dl, capacityDir: dirCap(s.l, t, ul, dl), latencyMs: res.timing.rttAppMs / 2, issues, label: `${s.b.prof.short} · ${rateTxt(res.dl.rate.kbps / Math.max(1, users))}` }, extra);
+        } else {
+          const standby = s.ok && d.acc.access === 'terrestre';
+          if (standby) issues.unshift({ level: 'info', text: 'En veille : le réseau terrestre est prioritaire tant que sa couverture est suffisante.' });
+          st = downState('d2d', issues, Object.assign(extra, { standby, label: standby ? 'veille' : res.geometry.visible ? 'pas de service' : 'satellite non visible' }));
+        }
+        s.l.state = d2dCut(s.l, st);
+      }
+    }
+    // Liens d'accès d'un terminal absent ou incomplet
+    for (const l of S.topo.links.filter((x) => (x.medium === 'd2d' || x.medium === 'cell') && !x.state)) l.state = downState(l.medium, [{ level: 'error', text: 'Liaison incomplète.' }]);
+  }
+  function coreThreshold() {
+    const core = S.topo.nodes.find((n) => n.type === 'mobileCore');
+    return core ? num(core.props.thresholdDbm, -115) : -115;
+  }
+  function rateTxt(kbps) {
+    if (!Number.isFinite(kbps) || kbps <= 0) return '0 kbit/s';
+    return kbps >= 1000 ? fmt(kbps / 1000, kbps >= 10000 ? 0 : 1) + ' Mbit/s' : fmt(kbps, kbps >= 100 ? 0 : 1) + ' kbit/s';
+  }
+
   /** Recalcule tous les liens puis la couche réseau. */
   function computeAll() {
     const states = new Map();
@@ -1505,6 +1829,10 @@
     }
     for (const l of S.topo.links) {
       let st;
+      if (D2D_MEDIA.includes(l.medium)) {
+        l.state = null;
+        continue;
+      }
       try {
         if (l.medium === 'fh') st = computeFh(l);
         else if (l.medium === 'blr') st = computeBlr(l);
@@ -1521,6 +1849,14 @@
       }
       l.state = st;
     }
+    // Direct-to-Device : liaisons de connexion, puis arbitrage terrestre / satellite des terminaux
+    try {
+      computeFeeders();
+      computeD2d();
+    } catch (err) {
+      console.error(err);
+      for (const l of S.topo.links.filter((x) => D2D_MEDIA.includes(x.medium) && !x.state)) l.state = downState(l.medium, [{ level: 'error', text: 'Erreur de calcul : ' + err.message }]);
+    }
     logLinkChanges();
     // Couche réseau
     const prev = S.analysis;
@@ -1536,9 +1872,14 @@
     for (const l of S.topo.links) {
       if (!RADIO_MEDIA.includes(l.medium)) continue;
       const st = l.state;
-      const key = st.status + '|' + modOf(st);
+      const key = st.status + '|' + modOf(st) + (st.standby ? '|veille' : '');
       const prev = S.prevLinkStatus.get(l.id);
-      if (prev !== undefined && prev !== key) {
+      if (prev !== undefined && prev !== key && (l.medium === 'd2d' || l.medium === 'cell')) {
+        const name = linkName(l);
+        if (st.up) log(`📶 ${name} : ${l.medium === 'd2d' ? 'terminal rattaché au satellite' : 'terminal rattaché à la cellule terrestre'} (${st.label}).`, l.medium === 'd2d' ? 'warn' : 'ok');
+        else if (st.standby) log(`⏸ ${name} : en veille.`, 'info');
+        else log(`✖ ${name} : pas de service.`, 'error');
+      } else if (prev !== undefined && prev !== key) {
         const name = linkName(l);
         const r = rain();
         const ctx = r > 0 ? ` (pluie ${fmt(r, 0)} mm/h)` : '';
@@ -1555,6 +1896,8 @@
     if (st.kind === 'fh') return (st.budgets.ab.activeModulation || {}).id || '—';
     if (st.kind === 'blr') return (st.budgets.dl.activeModulation || {}).id || '—';
     if (st.kind === 'vsat' && st.result) return (st.result.forward.modcod || {}).id || '—';
+    if (st.kind === 'd2d' && st.result) return st.result.dl.rate.cqi ? 'CQI ' + st.result.dl.rate.cqi.cqi + (st.result.dl.rate.reps > 1 ? ' ×' + st.result.dl.rate.reps : '') : '—';
+    if (st.kind === 'cell' && st.cell) return st.cell.rate.cqi ? 'CQI ' + st.cell.rate.cqi.cqi : '—';
     return '';
   }
   function linkName(l) {
@@ -1563,7 +1906,7 @@
     const b = nodeById(l.b);
     const an = a ? (siteOf(a) ? siteOf(a).name : a.name) : '?';
     const bn = b ? (siteOf(b) ? siteOf(b).name : b.name) : '?';
-    const prefix = { fh: 'FH', blr: 'BLR', vsat: 'VSAT' }[l.medium] || '';
+    const prefix = { fh: 'FH', blr: 'BLR', vsat: 'VSAT', d2d: 'D2D', feeder: 'Feeder', cell: '4G' }[l.medium] || '';
     return (prefix ? prefix + ' ' : '') + an + ' ↔ ' + bn;
   }
 
@@ -1877,6 +2220,22 @@
         return `DVB-S2X${num(p.accessVlan) ? ' · VLAN ' + p.accessVlan : ''}`;
       case 'router':
         return (p.mpls ? 'MPLS' : 'IP') + (p.loopback ? ' · ' + p.loopback : '');
+      case 'd2dSat': {
+        const pr = D2.getProfile(p.profile);
+        const g = pr.orbit === 'GEO' ? 'GEO' : d2dMoving(n) ? 'LEO défilant' : `LEO · El ${fmt(num(p.elevationDeg, 50), 0)}°`;
+        return `${pr.short} · ${D2.getBand(p.band || pr.band).id} · ${g}`;
+      }
+      case 'ntnGateway':
+        return 'Feeder' + (p.localRain ? ' · pluie locale' : '');
+      case 'mobileCore':
+        return 'EPC / 5GC' + (p.ntnAgreement === false ? '' : ' · NTN');
+      case 'ue':
+      case 'iotDevice':
+      case 'vehicle': {
+        const acc = S.topo.links.filter((l) => (l.medium === 'd2d' || l.medium === 'cell') && (l.a === n.id || l.b === n.id)).find((l) => l.state && l.state.up);
+        const via = acc ? (acc.medium === 'd2d' ? '📡 satellite' : '📶 4G terrestre') : 'pas de réseau';
+        return via + (p.ip ? ' · ' + p.ip : '');
+      }
       case 'switch':
         return [p.erps ? 'ERPS' : '', p.rplOwner ? 'RPL owner' : '', p.l3 ? 'L3' : '', p.vlans && p.vlans !== 'all' ? 'VLAN ' + p.vlans : ''].filter(Boolean).join(' · ') || 'L2';
       default:
@@ -1951,7 +2310,7 @@
         const htt = el('title', null, hg);
         htt.textContent = `Tirer vers le haut ou le bas pour régler la hauteur du pylône (${TOWER_MIN_M} à ${TOWER_MAX_M} m)`;
       }
-      el('rect', { class: 'node-bg', x: -sz / 2, y: -sz / 2, width: sz, height: sz, rx: n.type === 'satellite' ? sz / 2 : 9 }, g);
+      el('rect', { class: 'node-bg', x: -sz / 2, y: -sz / 2, width: sz, height: sz, rx: n.type === 'satellite' || n.type === 'd2dSat' ? sz / 2 : 9 }, g);
       const ic = sz * 0.64;
       const ico = el('use', { class: 'node-icon', href: '#' + iconId(n), x: -ic / 2, y: -ic / 2, width: ic, height: ic }, g);
       const aim = aimTransform(n);
@@ -1990,6 +2349,15 @@
     clear(L.links);
     clear(L.beams);
     clear(L.overlay);
+    // Trajets des terminaux mobiles
+    for (const n of S.topo.nodes.filter(onRoute)) {
+      const e = routeEnd(n);
+      el('line', { class: 'route-line', x1: n.x, y1: n.y, x2: e.x, y2: e.y }, L.links);
+      el('circle', { class: 'route-end', cx: e.x, cy: e.y, r: 4 }, L.links);
+      el('circle', { class: 'route-end', cx: n.x, cy: n.y, r: 4 }, L.links);
+      const t = el('text', { class: 'route-label', x: e.x, y: e.y - 8 }, L.links);
+      t.textContent = `arrivée · ${fmt(num(n.props.routeKm, 0), 0)} km`;
+    }
     // Lignes de fixation équipement → site
     for (const n of S.topo.nodes) {
       const s = siteOf(n);
@@ -2006,6 +2374,7 @@
       const cls = ['link', 'link-' + l.medium];
       if (RADIO_MEDIA.includes(l.medium)) cls.push('st-' + (st.status || 'down'));
       if (st.cut) cls.push('cut');
+      if (st.standby) cls.push('standby');
       if (blocked.has(l.id)) cls.push('blocked');
       if (l.props && l.props.backup) cls.push('backup');
       if (S.selection && S.selection.kind === 'link' && S.selection.id === l.id) cls.push('selected');
@@ -2044,6 +2413,7 @@
         t.textContent = 'RPL';
       }
     }
+    renderD2dFootprints();
     // Chemin du flux sélectionné
     if (S.selectedFlow && S.analysis) {
       const f = S.analysis.flows.find((x) => x.id === S.selectedFlow);
@@ -2055,6 +2425,26 @@
     // Lien en cours de création
     if (S.pending && S.pointer) {
       el('line', { class: 'temp-link', x1: S.pending.x, y1: S.pending.y, x2: S.pointer.x, y2: S.pointer.y }, L.overlay);
+    }
+  }
+  /** Empreinte au sol du faisceau d'un satellite D2D (cône vers les terminaux servis). */
+  function renderD2dFootprints() {
+    for (const sat of S.topo.nodes.filter((n) => n.type === 'd2dSat')) {
+      const ls = S.topo.links.filter((l) => l.medium === 'd2d' && (l.a === sat.id || l.b === sat.id) && l.state && l.state.result);
+      if (!ls.length) continue;
+      const terms = ls.map((l) => nodeById(l.a === sat.id ? l.b : l.a)).filter(Boolean);
+      const r0 = ls[0].state.result;
+      if (!r0.geometry.visible) continue;
+      const cx = terms.reduce((a, t) => a + anchorOf(t).x, 0) / terms.length;
+      const gy = Math.max(...terms.map((t) => anchorOf(t).y)) + 40;
+      const wKm = Math.min(r0.sat.footprintKm, r0.profile.beamDiameterKm * 3);
+      const half = U.clamp(wKm / kmPerPx() / 2, 60, 2400);
+      const sp = vpos(sat);
+      const g = el('g', { class: 'd2d-footprint' }, L.beams);
+      el('path', { class: 'fp-cone', d: `M${sp.x - 6} ${sp.y + 12} L${cx - half} ${gy} L${cx + half} ${gy} L${sp.x + 6} ${sp.y + 12} Z` }, g);
+      el('line', { class: 'fp-ground', x1: cx - half, y1: gy, x2: cx + half, y2: gy }, g);
+      const t = el('text', { class: 'fp-label', x: cx, y: gy + 14 }, g);
+      t.textContent = `Empreinte du faisceau ≈ ${fmt(r0.sat.footprintKm, 0)} km${half >= 2400 ? ' (dépasse le plan)' : ''}`;
     }
   }
   function weatherSuffix(st) {
@@ -2163,6 +2553,8 @@
   function clampPos(n) {
     if (n.type === 'satellite') {
       n.y = ORBIT_Y[n.props.orbit] || ORBIT_Y.GEO;
+    } else if (n.type === 'd2dSat') {
+      n.y = ORBIT_Y[D2.getProfile(n.props.profile).orbit] || ORBIT_Y.LEO;
     } else if (n.y < GROUND_MIN_Y) n.y = GROUND_MIN_Y;
   }
   function findSiteAt(p, excludeId) {
@@ -2214,14 +2606,14 @@
       n.name = `${base} ${k}`;
     }
     if (isEndpoint(n)) n.props.ip = nextIp();
-    if (type === 'router') n.props.loopback = '10.255.0.' + (S.topo.nodes.filter((x) => x.type === 'router').length + 1);
+    if (type === 'router' || type === 'mobileCore') n.props.loopback = '10.255.0.' + (S.topo.nodes.filter((x) => x.type === 'router').length + 1);
     clampPos(n);
     S.topo.nodes.push(n);
     if (MOUNTABLE.includes(type)) {
       const site = findSiteAt(pos);
       if (site) mountOn(n, site);
     }
-    if (type === 'satellite') {
+    if (type === 'satellite' || type === 'd2dSat') {
       const r = wrap.getBoundingClientRect();
       if (S.view.y + ORBIT_Y.GEO * S.view.k < 0 || S.view.y + ORBIT_Y.GEO * S.view.k > r.height) toast('Satellite placé sur son orbite (bande spatiale en haut du canevas).', 'info');
     }
@@ -2386,7 +2778,7 @@
       y0 = Math.min(y0, n.y - (n.type === 'tower' ? Math.max(ext, sizeOf(n) / 2 + 20 + num(n.props.heightM, 40) * MAST_PX_PER_M) : ext));
       y1 = Math.max(y1, n.y + ext);
     }
-    y0 = Math.min(y0, S.topo.nodes.some((n) => n.type === 'satellite') ? 20 : HORIZON_Y - 40);
+    y0 = Math.min(y0, S.topo.nodes.some((n) => n.type === 'satellite' || n.type === 'd2dSat') ? 20 : HORIZON_Y - 40);
     const k = U.clamp(Math.min(r.width / (x1 - x0), r.height / (y1 - y0)), 0.15, 1.6);
     S.view.k = k;
     S.view.x = (r.width - (x1 - x0) * k) / 2 - x0 * k;
@@ -2412,7 +2804,7 @@
           pushHistory();
           const hk = handle.dataset.hkind || 'tower';
           const h0 = hk === 'floors' ? num(n.props.floors, 8) : hk === 'width' ? num(n.props.widthKm, 2) : num(n.props.heightM, hk === 'obst' ? 60 : 40);
-          drag = { kind: 'height', hk, node: n, sy: e.clientY, h0, moved: false };
+          drag = { kind: 'height', hk, node: n, sy: e.clientY, wx0: w.x, h0, moved: false };
           select({ kind: 'node', id: n.id });
           svg.classList.add('resizing');
           renderInspector();
@@ -2464,8 +2856,10 @@
         const n = drag.node;
         let changed = false;
         if (drag.hk === 'width') {
-          const r = Math.max(0, Math.abs(w.x - n.x) - 30); // poignée placée 30 px hors du disque
-          const v = U.clamp(Math.round(2 * r * kmPerPx() * 20) / 20, 0.05, 20);
+          // Déplacement relatif depuis le clic : le disque a un rayon minimal (18 px), une position
+          // absolue ferait sauter la largeur d'un obstacle étroit dès le premier mouvement.
+          const dr = Math.abs(w.x - n.x) - Math.abs(drag.wx0 - n.x);
+          const v = U.clamp(Math.round((drag.h0 + 2 * dr * kmPerPx()) * 20) / 20, 0.05, 20);
           if (v !== num(n.props.widthKm)) {
             n.props.widthKm = v;
             changed = true;
@@ -2982,7 +3376,101 @@
           { key: 'l3', label: 'Fonctions L3 (routage)', kind: 'check' }
         );
         break;
+      case 'd2dSat': {
+        const pr = D2.getProfile(p.profile);
+        const band = D2.getBand(p.band || pr.band);
+        const leo = pr.orbit !== 'GEO';
+        F.push(
+          { key: 'profile', label: 'Système', kind: 'select', options: Object.values(D2.PROFILES).map((x) => [x.id, x.label]) },
+          { kind: 'info', label: 'Principe', value: () => pr.description },
+          { key: 'band', label: 'Bande de fréquences', kind: 'select', options: [['', 'Bande du système (' + D2.getBand(pr.band).label + ')']].concat(Object.values(D2.BANDS).map((b) => [b.id, b.label + (b.family === 'MNO' ? ' · opérateur' : ' · MSS')])), hint: 'Bande « opérateur » : spectre terrestre de l’opérateur mobile réutilisé depuis l’espace. Bande MSS : spectre réservé au satellite.' },
+          { key: 'channelMHz', label: 'Largeur du canal', kind: 'select', options: [['0', 'Canal du système (' + fmt(pr.channelMHz, pr.channelMHz < 1 ? 1 : 0) + ' MHz)'], ['0.2', '200 kHz (NB-IoT)'], ['1.4', '1,4 MHz (LTE-M)'], ['3', '3 MHz'], ['5', '5 MHz'], ['10', '10 MHz'], ['20', '20 MHz']] },
+          { key: 'beamPowerW', label: 'Puissance par faisceau', kind: 'number', min: 0, max: 200, step: 0.5, unit: 'W', hint: '0 = valeur du système (' + fmt(pr.beamPowerW, 1) + ' W).' },
+          { key: 'reuse', label: 'Réutilisation de fréquence', kind: 'select', options: [['0', 'Celle du système (' + pr.reuse + ')'], ['1', '1 (toutes les fréquences dans chaque faisceau)'], ['3', '3 faisceaux'], ['4', '4 faisceaux'], ['7', '7 faisceaux']], hint: 'Plus la réutilisation est faible, plus la capacité est grande… et le brouillage entre faisceaux fort.' },
+          { key: 'motion', label: 'Mouvement', kind: 'select', options: [['fixed', 'Position figée (élévation fixe)'], ['moving', 'Défilement réel (horloge de simulation)']], when: () => leo, hint: 'En défilement, lancez l’horloge (▶) dans la barre d’outils du canevas.' },
+          { key: 'elevationDeg', label: 'Élévation du satellite servant', kind: 'range', min: 5, max: 90, step: 1, unit: '°', when: () => leo && p.motion !== 'moving', hint: `Élévation minimale du système : ${pr.minElevationDeg}°.` },
+          { key: 'satsPerPlane', label: 'Satellites par plan orbital', kind: 'number', min: 0, max: 120, step: 1, when: () => leo && p.motion === 'moving', hint: '0 = valeur par défaut du système. Trop peu de satellites → trous de couverture.' },
+          { key: 'passMaxElevDeg', label: 'Élévation maximale des passages', kind: 'range', min: 30, max: 90, step: 1, unit: '°', when: () => leo && p.motion === 'moving' },
+          { kind: 'info', label: 'Satellite servant (T+' + clockTxt(S.sim.t) + ')', value: () => { const c = d2dConstellation(n, S.sim.t); return c.serving ? `n° ${c.serving.index} · El ${fmt(c.serving.el, 1)}° · ${fmt(c.serving.slantKm, 0)} km` : 'aucun : trou de couverture'; }, when: () => leo && p.motion === 'moving' },
+          { key: 'satsTotal', label: 'Satellites de la constellation', kind: 'number', min: 0, max: 20000, step: 1, when: () => leo, hint: `0 = ${pr.satsTotal} (valeur du système). Sert à la disponibilité et à la revisite.` },
+          { key: 'backgroundUsers', label: 'Autres utilisateurs actifs dans le faisceau', kind: 'number', min: 0, max: 5000, step: 1, hint: 'Abonnés simulés qui partagent la capacité du faisceau avec les terminaux du canevas.' },
+          { kind: 'info', label: 'Altitude · période', value: () => fmt(pr.altitudeKm, 0) + ' km · ' + periodTxt(SP.orbitalPeriodMin(pr.altitudeKm)) },
+          { kind: 'info', label: 'Fréquences ↑ / ↓', value: () => fmt(band.ulMHz, 1) + ' / ' + fmt(band.dlMHz, 1) + ' MHz' },
+          { kind: 'info', label: 'Antenne du satellite', value: () => `${pr.antenna === 'reseau' ? 'réseau actif' : 'réflecteur'} ${fmt(D2.apertureM2(pr), 1)} m² · ${fmt(D2.apertureGainDbi(D2.apertureM2(pr), band.dlMHz, pr.efficiency), 1)} dBi` },
+          { kind: 'info', label: 'Charge utile', value: () => (pr.payload === 'regeneratif' ? 'régénérative (station de base à bord)' : 'transparente (« bent-pipe », station de base au sol)') },
+          { kind: 'info', label: 'Terminaux compatibles', value: () => pr.ueCompat }
+        );
+        break;
+      }
+      case 'ntnGateway':
+        F.push(
+          { kind: 'info', label: 'Rôle', value: () => 'Station sol du système satellite : reçoit la liaison de connexion (feeder, bande Ka ou C) et la remet au cœur mobile de l’opérateur.' },
+          { key: 'groundM', label: 'Altitude du site', kind: 'number', min: 0, max: 3000, step: 1, unit: 'm' },
+          { key: 'localRain', label: 'Subit la pluie locale', kind: 'check', hint: 'Un orage sur la station sol coupe le feeder en bande Ka : avec une charge utile transparente, tous les terminaux perdent le service.' },
+          { key: 'vlans', label: 'VLAN autorisés', kind: 'text' }
+        );
+        break;
+      case 'mobileCore':
+        F.push(
+          { kind: 'info', label: 'Rôle', value: () => 'Cœur de réseau de l’opérateur mobile (EPC 4G / 5GC) : authentification des abonnés, mobilité, passerelle vers Internet.' },
+          { key: 'ntnAgreement', label: 'Accord avec l’opérateur satellite', kind: 'check', hint: 'Sans accord (itinérance satellite), les abonnés sont refusés sur la cellule satellite : urgences seulement.' },
+          { key: 'thresholdDbm', label: 'Seuil de bascule vers le satellite', kind: 'range', min: -130, max: -95, step: 1, unit: 'dBm', hint: 'En dessous de ce RSRP terrestre, le terminal cherche la cellule satellite. Le réseau terrestre reste prioritaire.' },
+          { key: 'loopback', label: 'Adresse loopback', kind: 'text' },
+          { key: 'interVlan', label: 'Routage inter-VLAN', kind: 'check' },
+          { key: 'vlans', label: 'VLAN (sous-interfaces)', kind: 'text', placeholder: 'all ou 100,200' }
+        );
+        break;
+      case 'ue':
+      case 'iotDevice':
+      case 'vehicle': {
+        const envOpts = Object.values(D2.ENVIRONMENTS).map((e) => [e.id, e.label]);
+        if (n.type === 'ue') F.push({ key: 'terminal', label: 'Terminal', kind: 'select', options: [['smartphone', D2.TERMINALS.smartphone.label], ['smartphoneHpue', D2.TERMINALS.smartphoneHpue.label]] }, { key: 'environment', label: 'Où se trouve le terminal', kind: 'select', options: envOpts });
+        if (n.type === 'vehicle') F.push({ key: 'antenna', label: 'Antenne', kind: 'select', options: [['toit', 'Antenne de toit (module télématique)'], ['interieur', 'Smartphone dans l’habitacle']] });
+        if (n.type === 'iotDevice') F.push({ key: 'environment', label: 'Emplacement du capteur', kind: 'select', options: envOpts });
+        F.push(
+          { key: 'ntnChip', label: 'Puce NTN 3GPP (Rel-17)', kind: 'check', hint: 'Indispensable pour les systèmes NB-NTN / NR-NTN (précompensation GNSS). Un smartphone 4G classique ne fonctionne qu’avec le Direct-to-Cell LTE.' },
+          { key: 'simNtn', label: 'Abonnement autorisé sur le satellite', kind: 'check' },
+          { key: 'los', label: 'Vue dégagée du ciel (visibilité directe)', kind: 'check', hint: 'Décoché : masquage par la végétation ou les bâtiments (perte d’encombrement TR 38.811).' },
+          { key: 'beamPos', label: 'Position dans le faisceau', kind: 'range', min: 0, max: 1.5, step: 0.05, hint: '0 = centre du faisceau, 1 = bord à −3 dB, au-delà : hors faisceau.' }
+        );
+        if (n.type !== 'iotDevice') F.push({ key: 'ulRb', label: 'Blocs de ressources montants', kind: 'number', min: 0, max: 100, step: 1, hint: '0 = 1 bloc pour le bilan ; la capacité utilise l’allocation optimale calculée.' });
+        if (n.type === 'iotDevice')
+          F.push(
+            { key: 'ulTonesKHz', label: 'Sous-porteuse montante NB-IoT', kind: 'select', options: [['3.75', '3,75 kHz (1 tonalité)'], ['15', '15 kHz (1 tonalité)']] },
+            { key: 'reportsPerDay', label: 'Messages par jour', kind: 'number', min: 1, max: 1440, step: 1 },
+            { key: 'payloadBytes', label: 'Taille d’un message', kind: 'number', min: 1, max: 1600, step: 1, unit: 'octets' },
+            { key: 'capacityMAh', label: 'Capacité de la pile', kind: 'number', min: 100, max: 40000, step: 100, unit: 'mAh' },
+            { key: 'gnssFixS', label: 'Durée du point GNSS avant émission', kind: 'number', min: 0, max: 60, step: 0.5, unit: 's' },
+            { key: 'rai', label: 'Libération immédiate (RAI)', kind: 'check', hint: 'Release Assistance Indication : le module repasse en veille sans attendre la fin de la connexion.' },
+            { key: 'ephemerisAgeS', label: 'Âge des éphémérides', kind: 'number', min: 0, max: 86400, step: 10, unit: 's', hint: 'Des éphémérides anciennes faussent la précompensation Doppler.' }
+          );
+        if (n.type !== 'iotDevice' || p.motion === 'route')
+          F.push(
+            { key: 'motion', label: 'Mouvement', kind: 'select', options: [['fixed', 'Immobile'], ['route', 'Sur un trajet (horloge de simulation)']], hint: 'Le terminal fait l’aller-retour sur le trajet ; lancez l’horloge (▶) dans la barre du canevas.' },
+            { key: 'routeKm', label: 'Longueur du trajet', kind: 'number', min: 1, max: 2000, step: 1, unit: 'km', when: () => p.motion === 'route' },
+            { key: 'routeHeadingDeg', label: 'Direction du trajet', kind: 'range', min: 0, max: 359, step: 1, unit: '°', when: () => p.motion === 'route', hint: '0° = Nord (haut du plan), 90° = Est.' },
+            { key: 'speedKmh', label: 'Vitesse', kind: 'number', min: 1, max: 1000, step: 1, unit: 'km/h', when: () => p.motion === 'route' },
+            { kind: 'info', label: 'Position sur le trajet (T+' + clockTxt(S.sim.t) + ')', value: () => { const r = routeKmAt(n); return `${fmt(r.s, 1)} km sur ${fmt(r.L, 0)} km (${r.back ? 'retour' : 'aller'})`; }, when: () => p.motion === 'route' }
+          );
+        F.push(
+          { key: 'coordMode', label: 'Coordonnées', kind: 'select', options: [['plan', 'Depuis la position sur le plan'], ['manual', 'Saisie manuelle']] },
+          { key: 'lat', label: 'Latitude', kind: 'number', min: -80, max: 80, step: 0.01, unit: '° N', when: () => p.coordMode === 'manual' },
+          { key: 'lon', label: 'Longitude', kind: 'number', min: -180, max: 180, step: 0.01, unit: '° E', when: () => p.coordMode === 'manual' },
+          { kind: 'info', label: 'Réseau utilisé', value: () => { const a = S.topo.links.filter((l) => (l.medium === 'd2d' || l.medium === 'cell') && (l.a === n.id || l.b === n.id)).find((l) => l.state && l.state.up); return a ? (a.medium === 'd2d' ? 'satellite (' + a.state.label + ')' : 'cellule terrestre (' + a.state.label + ')') : 'aucun'; } },
+          ...ipFields()
+        );
+        break;
+      }
       default:
+        if (n.type === 'gnodeb')
+          F.push(
+            { key: 'cellBand', label: 'Bande de la cellule 4G', kind: 'select', options: Object.values(D2.BANDS).filter((b) => b.family === 'MNO').map((b) => [b.id, b.label]), hint: 'Utilisé quand des terminaux mobiles (smartphone, capteur, véhicule) sont reliés à cette station.' },
+            { key: 'cellTxDbm', label: 'Puissance d’émission', kind: 'number', min: 20, max: 49, step: 1, unit: 'dBm' },
+            { key: 'cellGainDbi', label: 'Gain de l’antenne sectorielle', kind: 'number', min: 0, max: 21, step: 0.5, unit: 'dBi' },
+            { key: 'cellHeightM', label: 'Hauteur de l’antenne', kind: 'number', min: 10, max: 150, step: 1, unit: 'm' },
+            { key: 'cellChannelMHz', label: 'Largeur du canal', kind: 'select', options: [['5', '5 MHz'], ['10', '10 MHz'], ['15', '15 MHz'], ['20', '20 MHz']] },
+            { key: 'terrain', label: 'Environnement', kind: 'select', options: [['rural', 'Rural dégagé'], ['suburbain', 'Suburbain'], ['urbain', 'Urbain']] }
+          );
         if (isEndpoint(n)) F.push(...ipFields());
     }
     F.push({ key: 'failed', label: 'Simuler une panne', kind: 'check', diag: true });
@@ -3227,6 +3715,17 @@
         delete S.satTrack[n.id];
       }
     }
+    if (n.type === 'd2dSat') {
+      if (['reuse', 'satsPerPlane'].includes(f.key)) n.props[f.key] = num(value);
+      clampPos(n);
+      if (['profile', 'satsPerPlane', 'motion', 'passMaxElevDeg'].includes(f.key)) {
+        delete S.satHist[n.id];
+        delete S.satTrack[n.id];
+        delete S.satVis[n.id];
+      }
+    }
+    if (f.key === 'ulTonesKHz') n.props.ulTonesKHz = num(value);
+    if (n.type === 'gnodeb' && f.key === 'cellChannelMHz') n.props.cellChannelMHz = num(value);
     if (n.type === 'vsatAntenna' && f.key === 'autoPoint' && value === false) {
       // Pré-remplit les champs de pointage avec des valeurs arrondies (à corriger par l'élève)
       const lk = radioLinksOf(n)[0];
@@ -3289,6 +3788,12 @@
   }
   function primaryRadioLink(n) {
     if (['antenna', 'fullOutdoor', 'blrBts', 'blrCpe', 'vsatAntenna', 'hub', 'satellite'].includes(n.type)) return radioLinksOf(n)[0] || null;
+    if (isD2dTerm(n)) {
+      const ls = radioLinksOf(n);
+      return ls.find((l) => l.state && l.state.up) || ls.find((l) => l.medium === 'd2d') || ls[0] || null;
+    }
+    if (n.type === 'd2dSat') return radioLinksOf(n).find((l) => l.medium === 'd2d') || radioLinksOf(n)[0] || null;
+    if (n.type === 'ntnGateway' || n.type === 'gnodeb') return radioLinksOf(n)[0] || null;
     if (n.type === 'odu') {
       const ant = neighborOfType(n, 'antenna', ['if']);
       return ant ? radioLinksOf(ant)[0] || null : null;
@@ -3359,7 +3864,7 @@
     const issues = [];
     for (const l of S.topo.links.filter((x) => x.a === n.id || x.b === n.id)) for (const i of (l.state && l.state.issues) || []) issues.push(i);
     if (issues.length) ipaneProps.appendChild(issuesBlock(issues));
-    if (S.mode === 'diag' && !isSite(n) && n.type !== 'satellite') {
+    if (S.mode === 'diag' && !isSite(n) && n.type !== 'satellite' && n.type !== 'd2dSat') {
       const lw = document.createElement('div');
       lw.className = 'section';
       lw.innerHTML = `<div class="section-title">Voyants</div>${ledsHtml(n)}`;
@@ -3542,7 +4047,7 @@
       '<div class="calc-steps">' +
       steps
         .map(
-          (s) => `<div class="calc-step"><div class="cs-head"><span class="cs-label">${esc(s.label)}</span><span class="cs-value">${fmtVal(s.value, s.unit)}</span></div>${s.formula ? `<div class="cs-formula">${esc(s.formula)}</div>` : ''}${s.substituted ? `<div class="cs-subst">${esc(s.substituted)}</div>` : ''}${s.note ? `<div class="cs-note">${esc(s.note)}</div>` : ''}</div>`
+          (s) => `<div class="calc-step${s.niveau ? ' lvl-' + s.niveau : ''}"><div class="cs-head"><span class="cs-label">${s.niveau && s.niveau !== 'bac' ? `<span class="lvl-tag">${LEVEL_LABEL[s.niveau]}</span>` : ''}${esc(s.label)}</span><span class="cs-value">${fmtVal(s.value, s.unit)}</span></div>${s.formula ? `<div class="cs-formula">${esc(s.formula)}</div>` : ''}${s.substituted ? `<div class="cs-subst">${esc(s.substituted)}</div>` : ''}${s.note ? `<div class="cs-note">${esc(s.note)}</div>` : ''}</div>`
         )
         .join('') +
       '</div>'
@@ -3556,7 +4061,7 @@
   function renderBudget(l, selNode) {
     if (!l || !l.state) {
       const radio = S.topo.links.some((x) => RADIO_MEDIA.includes(x.medium));
-      ipaneBudget.innerHTML = '<div class="empty-state"><p>Sélectionnez une liaison radio (FH, BLR ou VSAT), ou un équipement qui en fait partie, pour afficher son bilan détaillé pas à pas.</p></div>' + (radio ? recetteFicheHtml() : '');
+      ipaneBudget.innerHTML = '<div class="empty-state"><p>Sélectionnez une liaison radio (FH, BLR, VSAT ou Direct-to-Device), ou un équipement qui en fait partie, pour afficher son bilan détaillé pas à pas.</p></div>' + (radio ? recetteFicheHtml() : '');
       if (radio) bindRecetteFiche(ipaneBudget);
       return;
     }
@@ -3565,6 +4070,9 @@
     if (st.kind === 'blr' && st.budgets) return renderBlrBudget(l, st);
     if (st.kind === 'vsat' && st.role === 'remote' && st.result) return renderVsatBudget(l, st);
     if (st.kind === 'vsat' && st.role === 'hub') return renderHubBudget(l, st);
+    if (st.kind === 'd2d' && st.result) return renderD2dBudget(l, st);
+    if (st.kind === 'cell') return renderCellBudget(l, st);
+    if (st.kind === 'feeder') return renderFeederBudget(l, st);
     ipaneBudget.innerHTML = `<p><span class="status-pill down">Coupure</span></p>`;
     if (st.issues && st.issues.length) ipaneBudget.appendChild(issuesBlock(st.issues));
   }
@@ -3788,6 +4296,212 @@
     if (st.issues.length) ipaneBudget.appendChild(issuesBlock(st.issues));
   }
 
+  /* --- Direct-to-Device : niveau des calculs, bilans et analyseurs --- */
+  const LEVEL_LABEL = { bac: 'Bac Pro', licence: 'Licence', master: 'Master / Ingé.' };
+  function calcLevel() {
+    const v = lsGetE('mbv-niveau');
+    return LEVEL_RANK[v] !== undefined ? v : 'master';
+  }
+  const levelVisible = (s) => !s.niveau || LEVEL_RANK[s.niveau] <= LEVEL_RANK[calcLevel()];
+  function levelSwitch(onChange) {
+    const d = document.createElement('div');
+    d.className = 'level-switch';
+    d.innerHTML = `<label>Niveau des calculs</label><select class="level-select">${Object.entries(LEVEL_LABEL).map(([k, t]) => `<option value="${k}"${k === calcLevel() ? ' selected' : ''}>${t}</option>`).join('')}</select><span class="small-muted">Bac Pro : bilan essentiel · Licence : G/T, RSRP, empreinte · Master / ingénieur : modèles 3GPP complets</span>`;
+    d.querySelector('select').addEventListener('change', (e) => {
+      lsSetE('mbv-niveau', e.target.value);
+      stat('levelChange');
+      onChange();
+    });
+    return d;
+  }
+  /** Étapes regroupées par rubrique (moteur D2D), filtrées selon le niveau choisi. */
+  function groupedStepsHtml(steps) {
+    const groups = [];
+    for (const s of steps.filter(levelVisible)) {
+      let g = groups.find((x) => x.name === (s.group || 'Calculs'));
+      if (!g) groups.push((g = { name: s.group || 'Calculs', steps: [] }));
+      g.steps.push(s);
+    }
+    return groups.map((g) => `<div class="calc-group-title">${esc(g.name)}</div>${stepsHtml(g.steps)}`).join('');
+  }
+  const SERVICE_STATE = { ok: ['ok', 'disponible'], differe: ['warn', 'différé'], ko: ['err', 'indisponible'] };
+  function servicesTableHtml(services) {
+    return (
+      '<table class="data-table services-table"><thead><tr><th>Phase</th><th>Service</th><th>État</th></tr></thead><tbody>' +
+      services
+        .map((sv) => {
+          const [cls, txt] = SERVICE_STATE[sv.state];
+          return `<tr><td class="num">${sv.phase}</td><td>${esc(sv.label)}${sv.reasons.length ? `<div class="small-muted">${esc(sv.reasons.join(' ; '))}</div>` : ''}</td><td><span class="status-pill ${cls}">${txt}</span></td></tr>`;
+        })
+        .join('') +
+      '</tbody></table>'
+    );
+  }
+  function accessVerdictHtml(acc) {
+    if (!acc) return '';
+    const cls = acc.access === 'terrestre' ? 'ok' : acc.access === 'satellite' ? 'warn' : 'err';
+    const head = acc.access === 'terrestre' ? '📶 Réseau terrestre' : acc.access === 'satellite' ? '📡 Cellule satellite' : '⛔ Aucun réseau';
+    return `<div class="verdict ${cls}"><b>${head}</b> — ${esc(acc.reason)}</div>`;
+  }
+  const d2dStatusLabel = (st) => (st.status === 'optimal' ? 'Voix et données' : st.status === 'degraded' ? 'Service réduit (messages, faible débit)' : 'Pas de service');
+  function renderD2dBudget(l, st) {
+    const r = st.result;
+    ipaneBudget.innerHTML = '';
+    ipaneBudget.appendChild(levelSwitch(() => renderBudget(l)));
+    const box = document.createElement('div');
+    const perUserDl = r.dl.rate.kbps / Math.max(1, st.users);
+    const dz = r.design || null; // bilan calculé (sans pertes cachées) : la mesure s'en écarte
+    const dopTxt = r.doppler.method === 'aucune' ? '≈ 0' : `±${fmt(r.doppler.maxKHz, 1)} kHz`;
+    box.innerHTML =
+      `<p><span class="status-pill ${st.standby ? 'warn' : st.status}">${st.standby ? 'En veille' : d2dStatusLabel(st)}</span> <span class="small-muted">${esc(r.profile.label)} · ${esc(r.band.label)} · ${esc(r.tech.label)}</span></p>` +
+      accessVerdictHtml(st.access) +
+      '<div class="kpi-grid">' +
+      kpi('Élévation', fmt(r.geometry.elevation, 1), '°', r.geometry.visible ? 'ok' : 'err') +
+      kpi('Distance', fmt(r.geometry.slantKm, 0), 'km') +
+      (r.dl.rsrpDbm !== null ? kpi(dz ? 'RSRP calculé / mesuré' : 'RSRP', dz ? fmt(dz.dl.rsrpDbm, 1) + ' / ' + fmt(r.dl.rsrpDbm, 1) : fmt(r.dl.rsrpDbm, 1), 'dBm', r.dl.rsrpDbm >= -120 ? 'ok' : r.dl.rsrpDbm >= -128 ? 'warn' : 'err', !!dz) : kpi(dz ? 'Puissance reçue calculée / mesurée' : 'Puissance reçue', dz ? fmt(dz.dl.cDbm, 1) + ' / ' + fmt(r.dl.cDbm, 1) : fmt(r.dl.cDbm, 1), 'dBm', '', !!dz)) +
+      kpi('SINR descendant', fmt(r.dl.sinrDb, 1), 'dB', r.dl.sinrDb >= 0 ? 'ok' : r.dl.rate.kbps > 0 ? 'warn' : 'err') +
+      kpi('Débit du faisceau ↓', rateTxt(r.dl.rate.kbps), '', r.dl.rate.kbps > 0 ? 'ok' : 'err') +
+      kpi('Par utilisateur ↓ (' + st.users + ' actifs)', rateTxt(perUserDl), '') +
+      kpi('Montant optimal ↑', rateTxt(r.ul.best.kbps), '', r.ul.best.kbps > 0 && r.ulOk ? 'ok' : 'err') +
+      kpi('Doppler', dopTxt, '', r.doppler.ulOk ? 'ok' : 'err') +
+      kpi('RTT application', fmt(r.timing.rttAppMs, 0), 'ms', r.timing.rttAppMs > 400 ? 'warn' : 'ok') +
+      (Number.isFinite(r.instDopplerKHz) ? kpi('Doppler instantané', fmt(r.instDopplerKHz, 1), 'kHz') : '') +
+      '</div>';
+    ipaneBudget.appendChild(box);
+    if (st.issues && st.issues.length) ipaneBudget.appendChild(issuesBlock(st.issues));
+    const g = document.createElement('div');
+    g.innerHTML = `<div class="calc-group-title">Services progressifs</div>${servicesTableHtml(st.services)}<p class="small-muted">Phase 1 : SMS et alertes · 2 : messagerie et IoT · 3 : voix et données · 4 : haut débit. « Différé » : service possible seulement pendant le passage d’un satellite (couverture intermittente).</p>` + (dz ? '<p class="small-muted">Le calcul ci-dessous est le bilan théorique ; le terminal mesure un niveau différent : cherchez l’origine de l’écart.</p>' : '') + groupedStepsHtml((dz || r).steps);
+    ipaneBudget.appendChild(g);
+  }
+  function renderCellBudget(l, st) {
+    const c = st.cell;
+    ipaneBudget.innerHTML = '';
+    if (!c) {
+      ipaneBudget.innerHTML = '<p><span class="status-pill down">Hors service</span></p>';
+      if (st.issues && st.issues.length) ipaneBudget.appendChild(issuesBlock(st.issues));
+      return;
+    }
+    ipaneBudget.appendChild(levelSwitch(() => renderBudget(l)));
+    const thr = coreThreshold();
+    const box = document.createElement('div');
+    box.innerHTML =
+      `<p><span class="status-pill ${st.up ? st.status : st.standby ? 'warn' : 'down'}">${st.up ? (st.status === 'optimal' ? 'Bonne couverture' : 'Couverture faible') : st.standby ? 'En veille' : 'Pas de service'}</span> <span class="small-muted">Cellule 4G ${esc(c.band.label)} · ${esc(st.bts.name)}</span></p>` +
+      accessVerdictHtml(st.access) +
+      '<div class="kpi-grid">' +
+      kpi('Distance à la BTS', fmt(distKm(st.term, st.bts), 1), 'km') +
+      (c.design ? kpi('RSRP terrestre calculé / mesuré', fmt(c.design.rsrp, 1) + ' / ' + fmt(c.rsrp, 1), 'dBm', c.rsrp >= -100 ? 'ok' : c.rsrp >= thr ? 'warn' : 'err', true) : kpi('RSRP terrestre', fmt(c.rsrp, 1), 'dBm', c.rsrp >= -100 ? 'ok' : c.rsrp >= thr ? 'warn' : 'err')) +
+      kpi('Seuil de bascule', fmt(thr, 0), 'dBm') +
+      kpi('Rayon de couverture', fmt(c.radiusKm, 1), 'km') +
+      kpi('SNR', fmt(c.snr, 1), 'dB') +
+      kpi('Débit de la cellule ↓', rateTxt(c.rate.kbps), '') +
+      '</div>';
+    ipaneBudget.appendChild(box);
+    if (st.issues && st.issues.length) ipaneBudget.appendChild(issuesBlock(st.issues));
+    const g = document.createElement('div');
+    g.innerHTML = `<div class="calc-group-title">Cellule terrestre</div>${stepsHtml((c.design || c).steps.filter(levelVisible))}`;
+    ipaneBudget.appendChild(g);
+  }
+  function renderFeederBudget(l, st) {
+    const prof = st.sat ? d2dProfileOf(st.sat) : null;
+    ipaneBudget.innerHTML =
+      `<p><span class="status-pill ${st.status}">${st.status === 'optimal' ? 'En service' : st.status === 'degraded' ? 'Dégradée (pluie)' : 'Coupée'}</span> <span class="small-muted">Liaison de connexion${st.band ? ' · bande ' + esc(st.band.id) : ''}</span></p>` +
+      '<div class="kpi-grid">' +
+      kpi('C/N feeder', Number.isFinite(st.cnDb) ? fmt(st.cnDb, 1) : '—', 'dB', st.cnDb >= 10 ? 'ok' : st.cnDb >= 3 ? 'warn' : 'err') +
+      kpi('Atténuation pluie', Number.isFinite(st.rainDb) ? fmt(st.rainDb, 1) : '—', 'dB') +
+      kpi('Charge utile', prof ? (prof.payload === 'transparent' ? 'transparente' : 'régénérative') : '—', '') +
+      '</div>' +
+      `<p class="small-muted">${prof && prof.payload === 'transparent' ? 'Charge utile transparente : le bruit et la pluie du feeder s’ajoutent au bilan de chaque terminal.' : 'Charge utile régénérative : la station de base est à bord ; le feeder ne transporte que le trafic vers le cœur.'} Cochez « Subit la pluie locale » sur la station sol pour étudier un orage.</p>`;
+    if (st.issues && st.issues.length) ipaneBudget.appendChild(issuesBlock(st.issues));
+  }
+
+  /** Courbe d'un passage : Doppler (kHz) et élévation (°) en fonction du temps. */
+  function passChartSvg(pt) {
+    const W = 360;
+    const H = 200;
+    const m = { l: 36, r: 34, t: 12, b: 26 };
+    if (!pt.points.length) return '';
+    const T = pt.durationS || 1;
+    const dmax = Math.max(5, Math.ceil(Math.max(...pt.points.map((p) => Math.abs(p.dopplerKHz))) / 10) * 10);
+    const X = (t) => m.l + (t / T) * (W - m.l - m.r);
+    const Yd = (v) => m.t + ((dmax - v) / (2 * dmax)) * (H - m.t - m.b);
+    const Ye = (e) => H - m.b - (e / 90) * (H - m.t - m.b);
+    let s = `<svg viewBox="0 0 ${W} ${H}" xmlns="${SVGNS}" role="img" aria-label="Doppler et élévation pendant un passage">`;
+    for (const v of [-dmax, -dmax / 2, 0, dmax / 2, dmax]) s += `<line class="chart-gridline" x1="${m.l}" x2="${W - m.r}" y1="${Yd(v)}" y2="${Yd(v)}"/><text x="${m.l - 4}" y="${Yd(v) + 3}" text-anchor="end" style="fill:#a3e635;font-size:9px">${fmt(v, 0)}</text>`;
+    for (const e of [0, 30, 60, 90]) s += `<text x="${W - m.r + 4}" y="${Ye(e) + 3}" style="fill:#22d3ee;font-size:9px">${e}°</text>`;
+    const path = (fn) => pt.points.map((p, i) => `${i ? 'L' : 'M'}${X(p.t).toFixed(1)} ${fn(p).toFixed(1)}`).join(' ');
+    s += `<path d="${path((p) => Ye(p.el))}" fill="none" stroke="#22d3ee" stroke-width="1.6"/>`;
+    s += `<path d="${path((p) => Yd(p.dopplerKHz))}" fill="none" stroke="#a3e635" stroke-width="2"/>`;
+    const tick = niceStep(T / 60 / 5);
+    for (let mn = 0; mn * 60 <= T + 1e-6; mn += tick) s += `<text x="${X(mn * 60)}" y="${H - m.b + 12}" text-anchor="middle" style="fill:#7587a8;font-size:9px">${fmt(mn, mn % 1 ? 1 : 0)}</text>`;
+    s += `<text x="${W - m.r}" y="${H - 3}" text-anchor="end" style="fill:#7587a8;font-size:9px">temps depuis le lever (min)</text></svg>`;
+    return s;
+  }
+  /** RSRP terrestre et satellite en fonction de la distance à la BTS : où le terminal bascule. */
+  function cellChartSvg(term, bts, satRsrp, thr) {
+    const W = 360;
+    const H = 200;
+    const m = { l: 40, r: 12, t: 12, b: 26 };
+    const bp = bts.props;
+    const tp = d2dTermParams(term, { tech: 'LTE' });
+    const dNow = distKm(term, bts);
+    const dMaxKm = Math.max(10, Math.ceil(Math.max(dNow * 1.4, 30) / 10) * 10);
+    const pts = [];
+    for (let i = 1; i <= 80; i++) {
+      const d = (dMaxKm * i) / 80;
+      pts.push({ d, r: D2.terrestrialCell({ band: bp.cellBand, txDbm: num(bp.cellTxDbm, 46), gainDbi: num(bp.cellGainDbi, 17), hbM: num(bp.cellHeightM, 30), channelMHz: num(bp.cellChannelMHz, 10), terrain: bp.terrain, dKm: d, terminal: tp.terminal, environment: tp.environment }).rsrp });
+    }
+    const yMax = -60;
+    const yMin = -140;
+    const X = (d) => m.l + (d / dMaxKm) * (W - m.l - m.r);
+    const Y = (v) => m.t + ((yMax - U.clamp(v, yMin, yMax)) / (yMax - yMin)) * (H - m.t - m.b);
+    let s = `<svg viewBox="0 0 ${W} ${H}" xmlns="${SVGNS}" role="img" aria-label="RSRP terrestre et satellite selon la distance">`;
+    for (let v = yMin; v <= yMax; v += 20) s += `<line class="chart-gridline" x1="${m.l}" x2="${W - m.r}" y1="${Y(v)}" y2="${Y(v)}"/><text x="${m.l - 4}" y="${Y(v) + 3}" text-anchor="end" style="fill:#7587a8;font-size:9px">${v}</text>`;
+    s += `<line x1="${m.l}" x2="${W - m.r}" y1="${Y(thr)}" y2="${Y(thr)}" stroke="#ef4444" stroke-dasharray="4 3"/><text x="${W - m.r}" y="${Y(thr) - 3}" text-anchor="end" style="fill:#ef4444;font-size:9px">seuil de bascule ${thr} dBm</text>`;
+    if (Number.isFinite(satRsrp)) s += `<line x1="${m.l}" x2="${W - m.r}" y1="${Y(satRsrp)}" y2="${Y(satRsrp)}" stroke="#a3e635" stroke-width="1.6"/><text x="${m.l + 4}" y="${Y(satRsrp) - 3}" style="fill:#a3e635;font-size:9px">satellite ${fmt(satRsrp, 0)} dBm</text>`;
+    s += `<path d="${pts.map((p, i) => `${i ? 'L' : 'M'}${X(p.d).toFixed(1)} ${Y(p.r).toFixed(1)}`).join(' ')}" fill="none" stroke="#22d3ee" stroke-width="2"/>`;
+    s += `<line x1="${X(dNow)}" x2="${X(dNow)}" y1="${m.t}" y2="${H - m.b}" stroke="#e2e8f0" stroke-dasharray="2 3"/><text x="${X(dNow)}" y="${m.t + 8}" text-anchor="middle" style="fill:#e2e8f0;font-size:9px">${esc(term.name)}</text>`;
+    for (let k = 0; k <= 5; k++) s += `<text x="${X((dMaxKm * k) / 5)}" y="${H - m.b + 12}" text-anchor="middle" style="fill:#7587a8;font-size:9px">${fmt((dMaxKm * k) / 5, 0)}</text>`;
+    s += `<text x="${W - m.r}" y="${H - 3}" text-anchor="end" style="fill:#7587a8;font-size:9px">distance à la BTS (km)</text></svg>`;
+    return s;
+  }
+  function renderD2dAnalyzers(l, st) {
+    const host = ipaneProfile;
+    host.innerHTML = '';
+    host.appendChild(levelSwitch(() => renderProfile(l)));
+    const div = document.createElement('div');
+    let html = '';
+    if (l.medium === 'cell') {
+      const satL = radioLinksOf(st.term).find((x) => x.medium === 'd2d' && x.state && x.state.result);
+      const satRsrp = satL ? satL.state.result.dl.rsrpDbm : null;
+      html += `<div class="calc-group-title">Couverture terrestre et bascule vers le satellite</div><div class="chart-box">${cellChartSvg(st.term, st.bts, satRsrp, coreThreshold())}</div>`;
+      html += `<div class="chart-legend"><span><i style="background:#22d3ee"></i>RSRP de la cellule terrestre</span><span><i style="background:#a3e635"></i>RSRP de la cellule satellite</span><span><i style="border-top:2px dashed #ef4444;height:0"></i>Seuil de bascule</span></div>`;
+      html += `<p class="small-muted">Le terminal reste sur la cellule terrestre tant que son RSRP dépasse le seuil ; au-delà du rayon de couverture (${fmt(st.cell.rsrp >= -999 ? st.cell.radiusKm : 0, 1)} km), il bascule sur le satellite.</p>`;
+      div.innerHTML = html;
+      host.appendChild(div);
+      return;
+    }
+    const r = st.result;
+    const prof = r.profile;
+    if (prof.orbit !== 'GEO') {
+      const pt = D2.passTimeline(prof.id, { band: r.band.id, maxElevationDeg: d2dMoving(st.sat) ? num(st.sat.props.passMaxElevDeg, 80) : Math.max(r.geometry.elevation, prof.minElevationDeg + 1), stepS: 5 });
+      html += `<div class="calc-group-title">Passage d’un satellite : Doppler et élévation</div><div class="chart-box">${passChartSvg(pt)}</div>`;
+      html += `<div class="chart-legend"><span><i style="background:#a3e635"></i>Doppler montant (kHz)</span><span><i style="background:#22d3ee"></i>Élévation (°)</span></div>`;
+      html += `<p class="small-muted">Passage de ${fmt(pt.durationS / 60, 1)} min au-dessus de ${pt.minEl}° : le Doppler passe de +${fmt(Math.abs(pt.points[0].dopplerKHz), 1)} à −${fmt(Math.abs(pt.points[pt.points.length - 1].dopplerKHz), 1)} kHz (courbe en S), le plus vite au point culminant.</p>`;
+    } else html += `<div class="verdict ok">Satellite géostationnaire : élévation ${fmt(r.geometry.elevation, 1)}°, Doppler négligeable, mais ${fmt(r.timing.rttAppMs, 0)} ms d’aller-retour.</div>`;
+    const cov = st.coverage;
+    html += `<div class="calc-group-title">Couverture et constellation</div><div class="kpi-grid">${kpi('Rayon couvert par un satellite', fmt(cov.radiusKm, 0), 'km')}${kpi('Satellites pour un service continu', cov.nContinuous, '')}${kpi('Disponibilité', fmt(cov.availability * 100, 0), '%', cov.availability >= 1 ? 'ok' : 'warn')}${cov.availability < 1 ? kpi('Attente moyenne', fmt(cov.meanGapMin, 0), 'min', 'warn') : ''}</div>${stepsHtml(cov.steps.filter(levelVisible))}`;
+    const load = D2.beamLoad({ beamDiameterKm: Math.min(prof.beamDiameterKm, r.sat.footprintKm), densityPerKm2: 50, penetrationPct: 2, activityPct: 5, capacityKbps: r.dl.rate.kbps });
+    html += `<div class="calc-group-title">Partage du faisceau (zone rurale, 50 hab./km², 2 % d’abonnés satellite, 5 % actifs)</div>${stepsHtml(load.steps.filter(levelVisible))}`;
+    if (st.term.type === 'iotDevice') {
+      const tp = st.term.props;
+      const bat = D2.iotBattery({ capacityMAh: num(tp.capacityMAh, 5000), reportsPerDay: num(tp.reportsPerDay, 24), payloadBytes: num(tp.payloadBytes, 50), ulKbps: Math.max(0.01, r.ul.rate.kbps || r.ul.best.kbps || 0.01), repetitions: r.ul.rate.reps || 1, gnssFixS: num(tp.gnssFixS, 5), rai: tp.rai !== false });
+      html += `<div class="calc-group-title">Autonomie du capteur IoT</div><div class="kpi-grid">${kpi('Autonomie', fmt(bat.years, 1), 'ans', bat.years >= 10 ? 'ok' : bat.years >= 3 ? 'warn' : 'err')}${kpi('Courant moyen', fmt(bat.iAvgUa, 0), 'µA')}${kpi('Émission d’un message', fmt(bat.txS, 2), 's')}</div>${stepsHtml(bat.steps.filter(levelVisible))}`;
+      if (prof.storeForward && cov.availability < 1) html += `<div class="verdict warn">Stockage et retransmission : un message attend en moyenne ${fmt(cov.storeForwardMin, 0)} min avant d’arriver au serveur.</div>`;
+    }
+    div.innerHTML = html;
+    host.appendChild(div);
+  }
+
   /* --- Profil de terrain & Fresnel / pointage VSAT --- */
   function renderProfile(l) {
     if (!l || !l.state) {
@@ -3795,6 +4509,7 @@
       return;
     }
     const st = l.state;
+    if ((st.kind === 'd2d' && st.result) || (st.kind === 'cell' && st.cell)) return renderD2dAnalyzers(l, st);
     if ((st.kind === 'fh' || st.kind === 'blr') && st.profile) {
       const pr = st.profile;
       const a = st.kind === 'fh' ? st.ends.A.node : st.bts;
@@ -4343,12 +5058,13 @@
     const l = S.topo.links.length;
     $('#st-counts').textContent = `${n} équipement${n > 1 ? 's' : ''} · ${l} lien${l > 1 ? 's' : ''} · ${S.topo.flows.length} flux`;
     const radio = S.topo.links.filter((x) => RADIO_MEDIA.includes(x.medium));
-    const down = radio.filter((x) => x.state && x.state.status === 'down').length;
+    const idle = radio.filter((x) => x.state && x.state.standby).length;
+    const down = radio.filter((x) => x.state && x.state.status === 'down' && !x.state.standby).length;
     const deg = radio.filter((x) => x.state && x.state.status === 'degraded').length;
     const fl = S.analysis ? S.analysis.flows : [];
     const flOk = fl.filter((f) => f.status === 'ok').length;
     const h = $('#st-health');
-    h.textContent = radio.length || fl.length ? `Radio : ${radio.length - down - deg} OK / ${deg} dégradé(s) / ${down} coupé(s) · Flux : ${flOk}/${fl.length} OK` : '';
+    h.textContent = radio.length || fl.length ? `Radio : ${radio.length - down - deg - idle} OK / ${deg} dégradé(s) / ${down} coupé(s)${idle ? ` / ${idle} en veille` : ''} · Flux : ${flOk}/${fl.length} OK` : '';
     h.className = down || (fl.length && flOk < fl.length) ? 'error' : deg ? 'warn' : 'ok';
     $('#st-file').textContent = S.topo.settings.title;
     document.title = S.topo.settings.title + ' — MicroWave, BLR & VSAT Lab' + (TEACHER ? ' (enseignant)' : ' (élève)');
@@ -5045,6 +5761,14 @@
     isTutorial: () => isTutorial(S.lab),
     /* --- Horloge de simulation (satellites défilants) --- */
     simTime: () => S.sim.t,
+    /** Réseau utilisé par un terminal mobile : 'satellite', 'terrestre' ou 'aucun' (et le lien actif). */
+    d2dAccess(q) {
+      const n = API.node(q);
+      if (!n) return { access: 'aucun', link: null };
+      const l = S.topo.links.filter((x) => (x.medium === 'd2d' || x.medium === 'cell') && (x.a === n.id || x.b === n.id)).find((x) => x.state && x.state.up);
+      return { access: l ? (l.medium === 'd2d' ? 'satellite' : 'terrestre') : 'aucun', link: l || null, state: l ? l.state : null };
+    },
+    routeKm: (q) => (API.node(q) && onRoute(API.node(q)) ? routeKmAt(API.node(q)) : null),
     setSimTime(t) {
       S.sim.t = Math.max(0, num(t, 0));
       updateClockUi();

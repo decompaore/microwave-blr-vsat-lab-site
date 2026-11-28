@@ -29,6 +29,7 @@
   --fh: #22d3ee;
   --blr: #34d399;
   --vsat: #a78bfa;
+  --d2d: #a3e635;
   --ip: #f472b6;
   --site: #fbbf24;
   --wire: #8ea3c7;
@@ -102,6 +103,7 @@
   --fh: #0891b2;
   --blr: #059669;
   --vsat: #7c3aed;
+  --d2d: #4d7c0f;
   --ip: #db2777;
   --site: #b45309;
   --wire: #64748b;
@@ -579,6 +581,9 @@ input[type='range'] {
 .dot-vsat {
   background: var(--vsat);
 }
+.dot-d2d {
+  background: var(--d2d);
+}
 .dot-ip {
   background: var(--ip);
 }
@@ -646,6 +651,9 @@ input[type='range'] {
   color: var(--vsat);
 }
 .pal-group:nth-of-type(5) .pal-item svg {
+  color: var(--d2d);
+}
+.pal-group:nth-of-type(6) .pal-item svg {
   color: var(--ip);
 }
 .pal-item.hidden {
@@ -820,6 +828,10 @@ body:not([data-mode='diag']) .diag-only {
   border-color: var(--muted);
   border-top-style: dashed;
 }
+.lg-standby {
+  border-color: var(--muted);
+  border-top-style: dotted;
+}
 .canvas-hint {
   position: absolute;
   left: 50%;
@@ -993,6 +1005,9 @@ body:not([data-mode='diag']) .diag-only {
 .node.cat-vsat .node-icon {
   color: var(--vsat);
 }
+.node.cat-d2d .node-icon {
+  color: var(--d2d);
+}
 .node.cat-ip .node-icon {
   color: var(--ip);
 }
@@ -1079,6 +1094,18 @@ body:not([data-mode='diag']) .diag-only {
   stroke-dasharray: 2 6;
   stroke-width: 2.6;
 }
+.link-d2d .link-line {
+  stroke-dasharray: 6 4 1 4;
+  stroke-width: 2.4;
+}
+.link-feeder .link-line {
+  stroke-dasharray: 2 6;
+  stroke-width: 2.6;
+}
+.link-cell .link-line {
+  stroke-dasharray: 8 5;
+  stroke-width: 2.2;
+}
 .link.st-optimal .link-line {
   stroke: var(--ok);
 }
@@ -1092,6 +1119,11 @@ body:not([data-mode='diag']) .diag-only {
   stroke: var(--err);
   stroke-dasharray: 3 5;
   opacity: 0.7;
+}
+.link.standby .link-line {
+  stroke: var(--muted);
+  stroke-dasharray: 3 6;
+  opacity: 0.75;
 }
 .link.blocked .link-line {
   stroke: var(--muted);
@@ -1911,6 +1943,10 @@ body.anim-off .beam {
 .tag.vsat {
   color: var(--vsat);
   border-color: rgba(167, 139, 250, 0.35);
+}
+.tag.d2d {
+  color: var(--d2d);
+  border-color: rgba(163, 230, 53, 0.35);
 }
 .tag.ip {
   color: var(--ip);
@@ -3490,4 +3526,103 @@ body.resizing {
 }
 .width-handle {
   cursor: ew-resize;
+}
+
+/* Direct-to-Device : empreinte du faisceau, niveau des calculs */
+.d2d-footprint {
+  pointer-events: none;
+}
+.d2d-footprint .fp-cone {
+  fill: var(--d2d);
+  fill-opacity: 0.06;
+  stroke: var(--d2d);
+  stroke-opacity: 0.35;
+  stroke-dasharray: 4 6;
+}
+.d2d-footprint .fp-ground {
+  stroke: var(--d2d);
+  stroke-width: 3;
+  stroke-opacity: 0.5;
+}
+.d2d-footprint .fp-label {
+  fill: var(--d2d);
+  font-size: 10px;
+  text-anchor: middle;
+  font-family: var(--mono);
+}
+.level-switch {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  margin: 0 0 8px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.level-switch label {
+  font-weight: 600;
+  font-size: 12px;
+}
+.level-switch .small-muted {
+  flex-basis: 100%;
+}
+.lvl-tag {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 0 5px;
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  vertical-align: 1px;
+  color: var(--accent-ink);
+  background: var(--accent);
+}
+.calc-step.lvl-master .lvl-tag {
+  background: var(--violet);
+}
+.services-table td .small-muted {
+  font-size: 10.5px;
+}
+.route-line {
+  stroke: var(--d2d);
+  stroke-width: 1.6;
+  stroke-dasharray: 2 5;
+  opacity: 0.7;
+}
+.route-end {
+  fill: var(--bg);
+  stroke: var(--d2d);
+  stroke-width: 1.5;
+}
+.route-label {
+  fill: var(--d2d);
+  font-size: 10px;
+  text-anchor: middle;
+  font-family: var(--mono);
+}
+.lvl-box {
+  margin: 10px 0;
+  padding: 8px 12px;
+  border-left: 4px solid var(--accent);
+  border-radius: 6px;
+  background: var(--panel-2);
+}
+.lvl-box.master {
+  border-left-color: var(--violet);
+}
+.lvl-box > b:first-child {
+  display: inline-block;
+  margin-right: 4px;
+  padding: 0 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  text-transform: uppercase;
+  color: var(--accent-ink);
+  background: var(--accent);
+}
+.lvl-box.master > b:first-child {
+  background: var(--violet);
 }

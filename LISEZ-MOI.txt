@@ -1,5 +1,5 @@
 MicroWave, BLR & VSAT Lab — version élève
-Version : 2026-11-20-6a3cc0b
+Version : 2026-11-28-794b802
 
 LANCER LE SIMULATEUR
   Double-cliquez sur index.html (Chrome, Edge ou Firefox récent).

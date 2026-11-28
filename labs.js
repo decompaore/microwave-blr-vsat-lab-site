@@ -1990,12 +1990,598 @@
     });
     return { settings: { title: 'Exemple — BLR 5,8 GHz à trois secteurs', scaleKm: 0.5, rainMmH: 0 }, nodes, links, flows };
   }
+  /* =================== TP 17 à 21 : Direct-to-Device (NTN) =================== */
+  const acc = (api, n) => api.d2dAccess(n).access;
+  const d2dSt = (api, t, s) => {
+    const l = api.link(t, s);
+    return l && l.state && l.state.result ? l.state : null;
+  };
+  const LB = (txt) => `<div class="lvl-box licence"><b>Licence</b> — ${txt}</div>`;
+  const MB = (txt) => `<div class="lvl-box master"><b>Master / ingénieur</b> — ${txt}</div>`;
+  const D2D_LEVEL = 'Bac Pro → Licence → Master / ingénieur';
+
+  /* =================== TP 17 =================== */
+  LABS.push({
+    id: 'tp17',
+    
+    num: 'TP 17',
+    title: 'Bilan Direct-to-Device d’un smartphone : pourquoi le LEO et pas le GEO ?',
+    subtitle: 'Smartphone ordinaire ↔ satellite LEO : RSRP, SNR, élévation, intérieur, liaison montante, comparaison GEO',
+    duration: '2 h',
+    level: D2D_LEVEL,
+    tags: ['d2d'],
+    mode: 'design',
+    context:
+      '<p>Un opérateur mobile burkinabè veut offrir le service <b>Direct-to-Cell</b> dans les zones blanches : un smartphone 4G ordinaire, sans parabole, se rattache à un <b>satellite en orbite basse</b> (525 km) qui porte une station de base 4G. Le smartphone est loin de toute BTS.</p><p>Vous allez établir le <b>bilan de liaison</b> du smartphone, comprendre pourquoi il fonctionne malgré ses 200 mW et son antenne sans gain, et pourquoi on ne peut pas faire la même chose avec un satellite géostationnaire. Choisissez le <b>niveau des calculs</b> (Bac Pro, Licence, Master) dans l’onglet Bilan de liaison.</p>',
+    objectives: [
+      'Identifier la chaîne Direct-to-Device : terminal, satellite, liaison de connexion, station sol, cœur mobile.',
+      'Lire et vérifier un bilan descendant : FSL, PIRE, puissance reçue, RSRP, SNR.',
+      'Mesurer l’influence de l’élévation et de l’emplacement du terminal (extérieur, véhicule, intérieur).',
+      'Expliquer pourquoi la liaison montante d’un smartphone est limitée en puissance.',
+      'Comparer orbite basse et orbite géostationnaire pour un smartphone.',
+    ],
+    releves: [['Distance smartphone → satellite (50°)', 'km'], ['FSL descendant', 'dB'], ['Gain de l’antenne du satellite', 'dBi'], ['PIRE du faisceau', 'dBW'], ['Puissance reçue C', 'dBm'], ['RSRP', 'dBm'], ['SNR descendant', 'dB'], ['RSRP à 25° d’élévation', 'dBm'], ['SNR montant sur 1 bloc / sur 25 blocs', 'dB'], ['RTT application en GEO', 'ms']],
+    steps: [
+      {
+        title: 'Identifier la chaîne et le rattachement',
+        html: '<p>Observez le canevas : le <b>Smartphone</b> est relié au <b>Satellite D2D</b> (lien direct), lui-même relié à la <b>Station sol NTN</b> (liaison de connexion), raccordée en fibre au <b>Cœur mobile</b>. Sélectionnez le smartphone : la ligne « Réseau utilisé » indique la cellule choisie.</p>',
+        question: 'Décrivez le rôle de chaque équipement de la chaîne. Le smartphone est-il modifié ? Que se passerait-il si la fibre entre la station sol et le cœur mobile était coupée ?' + LB('Charge utile régénérative ou transparente : laquelle est utilisée ici, et qu’est-ce que cela change pour le délai ?'),
+        check: (api) => {
+          const a = acc(api, 'Smartphone');
+          return { ok: a === 'satellite', msg: a === 'satellite' ? 'Smartphone rattaché à la cellule satellite ✔' : 'Le smartphone n’est pas rattaché au satellite : vérifiez la chaîne.' };
+        },
+      },
+      {
+        title: 'Lire le bilan descendant',
+        html: '<p>Sélectionnez le lien <b>Smartphone ↔ Satellite D2D</b>, onglet <b>Bilan de liaison</b>. Relevez la distance, le FSL, le gain de l’antenne du satellite, la PIRE, la puissance reçue, le RSRP et le SNR.</p><div class="formula">C = PIRE − FSL − pertes + G_terminal        FSL = 32,45 + 20·log(d_km) + 20·log(f_MHz)</div>',
+        question: 'Recalculez le FSL à la main. Pourquoi le satellite doit-il avoir une antenne de plusieurs m² ?' + LB('Calculez le G/T du smartphone (NF = 7 dB, T_ant = 290 K) et comparez-le à celui d’une antenne VSAT de 1,2 m.') + MB('Détaillez les pertes du trajet (balayage, position dans le faisceau, scintillation, ombrage, polarisation, corps) et leur origine physique.'),
+        check: (api) => {
+          const s = d2dSt(api, 'Smartphone', 'Satellite D2D');
+          const ok = s && api.stats().tab_budget;
+          return { ok: !!ok, msg: s ? (api.stats().tab_budget ? `RSRP ${f(s.result.dl.rsrpDbm, 1)} dBm · SNR ${f(s.result.dl.snrDb, 1)} dB ✔` : 'Ouvrez l’onglet Bilan de liaison du lien direct.') : '—' };
+        },
+      },
+      {
+        title: 'Influence de l’élévation',
+        html: '<p>Sélectionnez le <b>Satellite D2D</b> et réglez l’<b>élévation du satellite servant</b> à <b>25°</b> (élévation minimale du système).</p>',
+        question: 'Relevez la nouvelle distance, le RSRP et le SNR. Pourquoi le signal baisse-t-il quand le satellite est bas sur l’horizon ?' + MB('Calculez l’angle de visée au satellite (sin η = R·cos E / (R + h)) et la perte de balayage du réseau actif (−12·log(cos η)).'),
+        check: (api) => {
+          const el = Number(api.node('Satellite D2D').props.elevationDeg);
+          return { ok: el <= 26, msg: el <= 26 ? `Élévation ${f(el, 0)}° ✔` : 'Réglez l’élévation à 25°.' };
+        },
+      },
+      {
+        title: 'Dans un véhicule, à l’intérieur',
+        html: '<p>Remettez l’élévation à <b>50°</b>. Sélectionnez le smartphone et placez-le successivement <b>à l’intérieur d’un bâtiment</b>, puis <b>dans un véhicule</b>. Observez le lien et le tableau des services.</p>',
+        question: 'Que se passe-t-il à l’intérieur ? Et dans un véhicule ? Quel conseil donner à un utilisateur en zone blanche ?',
+        check: (api) => {
+          const n = api.node('Smartphone');
+          const el = Number(api.node('Satellite D2D').props.elevationDeg);
+          const a = acc(api, 'Smartphone');
+          return { ok: n.props.environment === 'vehicule' && el >= 45 && a === 'satellite', msg: el < 45 ? 'Remettez l’élévation du satellite à 50°.' : n.props.environment !== 'vehicule' ? 'Placez le smartphone dans un véhicule (après avoir essayé l’intérieur).' : `Dans le véhicule : ${a === 'satellite' ? 'service maintenu' : 'pas de service'}.` };
+        },
+      },
+      {
+        title: 'La liaison montante, point faible',
+        html: '<p>Replacez le smartphone <b>en extérieur</b>. Dans ses paramètres, passez les <b>blocs de ressources montants</b> de 1 à <b>25</b>. Relevez le SNR montant dans les deux cas (rubrique Montant du bilan).</p><div class="formula">SNR = C − (k + 10·log T_sat + 10·log B)</div>',
+        question: 'Pourquoi le SNR montant baisse-t-il quand on alloue plus de blocs au smartphone ? De combien de dB pour 25 fois plus de bande ?' + MB('Calculez C/N0 et le plafond de Shannon D_max = (C/N0)·log₂(e). Expliquez l’allocation optimale affichée par le simulateur et la conséquence pour l’ordonnanceur.'),
+        check: (api) => {
+          const n = api.node('Smartphone');
+          return { ok: n.props.environment === 'exterieur' && Number(n.props.ulRb) >= 20, msg: n.props.environment !== 'exterieur' ? 'Replacez le smartphone en extérieur.' : `Blocs montants : ${n.props.ulRb || 1}${Number(n.props.ulRb) >= 20 ? ' ✔' : ' (réglez 25)'}.` };
+        },
+      },
+      {
+        title: 'Et avec un satellite géostationnaire ?',
+        html: '<p>Changez le <b>système</b> du satellite pour <b>IoT / messagerie NTN par satellite GEO bande L</b>. Observez le smartphone, puis cochez sa case <b>Puce NTN 3GPP (Rel-17)</b>.</p>',
+        question: 'Pourquoi le smartphone ordinaire ne trouve-t-il plus de réseau ? Avec la puce NTN, quels services restent possibles et quelle est la latence ? Comparez le FSL vers un GEO et vers le LEO.' + LB('Pourquoi un satellite GEO à réflecteur de 9 m sert-il des objets connectés, mais pas la voix d’un smartphone ?'),
+        check: (api) => {
+          const sat = api.node('Satellite D2D');
+          const a = acc(api, 'Smartphone');
+          return { ok: sat.props.profile === 'IOT_GEO' && !!api.node('Smartphone').props.ntnChip && a === 'satellite', msg: sat.props.profile !== 'IOT_GEO' ? 'Choisissez le système GEO bande L.' : !api.node('Smartphone').props.ntnChip ? 'Cochez « Puce NTN 3GPP (Rel-17) » sur le smartphone.' : `GEO : ${a === 'satellite' ? 'rattaché' : 'pas de service'}.` };
+        },
+      },
+    ],
+    conclusion: '<p>Un smartphone ordinaire peut joindre un satellite parce que tout l’effort est reporté sur le satellite : une antenne réseau de plusieurs m² (≈ 33 dBi), très proche en orbite basse (≈ 670 km). Le signal reste faible (RSRP ≈ −118 dBm) et fragile : élévation basse, véhicule ou bâtiment le dégradent. La liaison montante est limitée par les 200 mW du téléphone. En GEO, 35 dB de pertes en plus réservent le service direct aux messages et aux objets connectés.</p>',
+    build() {
+      const nodes = [];
+      const links = [];
+      d2dCore(nodes, links, 260, 780, { sats: [{ name: 'Satellite D2D', x: 620, props: { profile: 'D2C_LTE', elevationDeg: 50 } }] });
+      nodes.push(ue('Smartphone', 760, 520, '10.45.0.21'));
+      links.push(Lk('Smartphone', 'Satellite D2D'));
+      return { settings: { scaleKm: 10, rainMmH: 0 }, nodes, links, flows: [Fl('Smartphone', 'Serveur opérateur', 0.001, 'data', 'SMS'), Fl('Smartphone', 'Serveur opérateur', 0.04, 'voice', 'Appel')] };
+    },
+  });
+
+  /* =================== TP 18 =================== */
+  LABS.push({
+    id: 'tp18',
+    
+    num: 'TP 18',
+    title: 'Zone blanche : couverture terrestre, bascule et services progressifs',
+    subtitle: 'Rayon d’une cellule 4G rurale, seuil de bascule, partage du faisceau satellite, phases de service',
+    duration: '2 h',
+    level: D2D_LEVEL,
+    tags: ['d2d'],
+    mode: 'design',
+    context: '<p>Autour de Ziniaré, une BTS 4G en bande 800 MHz couvre le bourg. Trois abonnés sont plus ou moins loin : <b>Tél. bourg</b>, <b>Tél. ferme</b> et <b>Tél. hameau</b>. Tous les smartphones sont aussi reliés au <b>satellite Direct-to-Cell</b> de l’opérateur.</p><p>Vous allez déterminer jusqu’où va la couverture terrestre, quand les téléphones basculent sur le satellite, et quels services le satellite peut offrir quand beaucoup d’abonnés le partagent.</p>',
+    objectives: ['Calculer le rayon de couverture d’une cellule 4G rurale (Okumura-Hata).', 'Expliquer la priorité du réseau terrestre et le seuil de bascule.', 'Relier le nombre d’utilisateurs d’un faisceau au débit par utilisateur.', 'Classer les services en phases (SMS, messagerie, voix, données).', 'Relier la taille de la constellation à la disponibilité.'],
+    releves: [['Distance Tél. ferme ↔ BTS', 'km'], ['RSRP terrestre de Tél. ferme', 'dBm'], ['Rayon de couverture de la cellule (antenne 30 m)', 'km'], ['Rayon de couverture (antenne 60 m)', 'km'], ['Débit du faisceau satellite (5 MHz)', 'Mbit/s'], ['Débit par utilisateur (30 actifs)', 'kbit/s'], ['Débit par utilisateur (300 actifs)', 'kbit/s'], ['Disponibilité avec 60 satellites', '%']],
+    steps: [
+      {
+        title: 'Qui est couvert par la BTS ?',
+        html: '<p>Sélectionnez tour à tour le lien <b>accès 4G</b> de chaque téléphone vers la <b>BTS Ziniaré</b> (onglet Bilan de liaison, puis Profil &amp; Fresnel). Relevez la distance, le RSRP terrestre et le rayon de couverture.</p>',
+        question: 'Quels téléphones restent sur la 4G terrestre, lesquels basculent sur le satellite ? Pourquoi le réseau terrestre est-il prioritaire ?' + LB('Recalculez l’affaiblissement de parcours Okumura-Hata rural à la distance de Tél. ferme.'),
+        check: (api) => {
+          const ok = acc(api, 'Tél. bourg') === 'terrestre' && acc(api, 'Tél. hameau') === 'satellite' && api.stats().tab_profile;
+          return { ok: !!ok, msg: `bourg : ${acc(api, 'Tél. bourg')} · ferme : ${acc(api, 'Tél. ferme')} · hameau : ${acc(api, 'Tél. hameau')}${api.stats().tab_profile ? '' : ' · ouvrez l’onglet Profil & Fresnel d’un lien 4G'}` };
+        },
+      },
+      {
+        title: 'Le seuil de bascule',
+        html: '<p>Sélectionnez le <b>Cœur mobile</b> et descendez le <b>seuil de bascule vers le satellite</b> de −115 à <b>−125 dBm</b>.</p>',
+        question: 'Que fait Tél. ferme ? Quel est l’intérêt d’un seuil bas pour l’opérateur ? Quel est le risque pour la qualité de service ?' + MB('Qu’est-ce que le « ping-pong » entre cellules ? Comment une hystérésis sur le seuil l’évite-t-elle ?'),
+        check: (api) => {
+          const thr = Number(api.node('Cœur mobile').props.thresholdDbm);
+          return { ok: thr <= -122, msg: thr <= -122 ? `Seuil ${thr} dBm · Tél. ferme : ${acc(api, 'Tél. ferme')} ✔` : 'Réglez le seuil à −125 dBm.' };
+        },
+      },
+      {
+        title: 'Agrandir la cellule terrestre',
+        html: '<p>Remettez le seuil à <b>−115 dBm</b>. Sélectionnez la <b>BTS Ziniaré</b> et montez la <b>hauteur de l’antenne</b> de 30 à <b>60 m</b>.</p>',
+        question: 'Comment évolue le rayon de couverture ? Tél. ferme revient-il sur la 4G ? Est-ce une solution pour le hameau ?',
+        check: (api) => {
+          const h = Number(api.node('BTS Ziniaré').props.cellHeightM);
+          const thr = Number(api.node('Cœur mobile').props.thresholdDbm);
+          return { ok: h >= 55 && thr >= -116, msg: thr < -116 ? 'Remettez le seuil à −115 dBm.' : h < 55 ? 'Montez l’antenne de la BTS à 60 m.' : `Antenne ${h} m · Tél. ferme : ${acc(api, 'Tél. ferme')} ✔` };
+        },
+      },
+      {
+        title: 'Partager le faisceau satellite',
+        html: '<p>Sélectionnez le lien direct <b>Tél. hameau ↔ Satellite D2C</b> : relevez le débit du faisceau, le nombre d’utilisateurs actifs et le débit par utilisateur. Puis réglez les <b>autres utilisateurs actifs dans le faisceau</b> du satellite à <b>300</b>.</p>',
+        question: 'Comment évolue le débit par utilisateur ? Quels services disparaissent, lesquels restent ? Expliquez la notion de « services progressifs ».' + LB('Le faisceau mesure ≈ 60 km : combien d’habitants contient-il pour 50 hab./km² ? Combien d’abonnés actifs si 2 % sont abonnés au satellite et 5 % actifs en même temps ?'),
+        check: (api) => {
+          const u = Number(api.node('Satellite D2C').props.backgroundUsers);
+          const s = d2dSt(api, 'Tél. hameau', 'Satellite D2C');
+          const v = s && s.services.find((x) => x.id === 'voix');
+          return { ok: u >= 250 && v && v.state !== 'ok', msg: u < 250 ? 'Réglez 300 autres utilisateurs actifs dans le faisceau.' : `Voix : ${v ? v.state : '—'} · SMS : ${s ? s.services.find((x) => x.id === 'sms').state : '—'}` };
+        },
+      },
+      {
+        title: 'Élargir le canal satellite',
+        html: '<p>Remettez <b>30</b> autres utilisateurs. Réglez la <b>largeur du canal</b> du satellite sur <b>10 MHz</b>.</p>',
+        question: 'Le débit du faisceau double-t-il ? Que devient le SNR ? Pourquoi l’opérateur n’utilise-t-il pas toute sa bande pour le satellite ?' + MB('À puissance par faisceau constante, exprimez la variation du SNR et du débit (régime limité en puissance ou en bande ?).'),
+        check: (api) => {
+          const p = api.node('Satellite D2C').props;
+          return { ok: Number(p.channelMHz) === 10 && Number(p.backgroundUsers) <= 50, msg: Number(p.backgroundUsers) > 50 ? 'Remettez 30 autres utilisateurs.' : Number(p.channelMHz) !== 10 ? 'Réglez un canal de 10 MHz.' : 'Canal de 10 MHz ✔' };
+        },
+      },
+      {
+        title: 'Une constellation incomplète',
+        html: '<p>Réglez le nombre de <b>satellites de la constellation</b> à <b>60</b> (début de déploiement). Observez le tableau des services du lien Tél. hameau ↔ Satellite D2C et l’onglet Profil &amp; Fresnel (Couverture et constellation).</p>',
+        question: 'Quelle est la disponibilité ? Pourquoi la voix devient-elle impossible alors que les SMS passent en « différé » ? Combien de satellites faut-il au minimum pour une couverture continue ?' + LB('Retrouvez ce minimum à partir du demi-angle au centre θ et de la surface couverte par un satellite.'),
+        check: (api) => {
+          const s = d2dSt(api, 'Tél. hameau', 'Satellite D2C');
+          const n = Number(api.node('Satellite D2C').props.satsTotal);
+          return { ok: n > 0 && n <= 100 && s && s.coverage.availability < 1, msg: n > 0 && n <= 100 ? `Disponibilité ${s ? f(s.coverage.availability * 100, 0) : '—'} % ✔` : 'Réglez 60 satellites dans la constellation.' };
+        },
+      },
+    ],
+    conclusion: '<p>La 4G terrestre reste prioritaire et couvre une dizaine de kilomètres en milieu rural ; au-delà, la cellule satellite prend le relais. Un faisceau satellite d’environ 60 km offre quelques Mbit/s partagés : avec peu d’abonnés, la voix passe ; quand le faisceau se remplit, seuls les SMS et la messagerie restent. Une constellation incomplète n’offre que des services différés.</p>',
+    build() {
+      const nodes = [];
+      const links = [];
+      d2dCore(nodes, links, 260, 780, { sats: [{ name: 'Satellite D2C', x: 640, props: { profile: 'D2C_LTE', elevationDeg: 50 } }] });
+      nodes.push(bts('BTS Ziniaré', 260, 460, '10.0.0.2'), ue('Tél. bourg', 290, 490, '10.45.0.21'), ue('Tél. ferme', 330, 530, '10.45.0.22'), ue('Tél. hameau', 700, 470, '10.45.0.23'));
+      links.push(Lk('BTS Ziniaré', 'Cœur mobile', { capacityMbps: 10000 }, 'fiber'));
+      for (const t of ['Tél. bourg', 'Tél. ferme', 'Tél. hameau']) links.push(Lk(t, 'BTS Ziniaré'), Lk(t, 'Satellite D2C'));
+      return { settings: { scaleKm: 10, rainMmH: 0 }, nodes, links, flows: [Fl('Tél. bourg', 'Serveur opérateur', 0.04, 'voice', 'Appel bourg'), Fl('Tél. hameau', 'Serveur opérateur', 0.04, 'voice', 'Appel hameau'), Fl('Tél. hameau', 'Serveur opérateur', 0.001, 'data', 'SMS hameau')] };
+    },
+  });
+
+  /* =================== TP 19 =================== */
+  LABS.push({
+    id: 'tp19',
+    
+    num: 'TP 19',
+    title: 'Catastrophe naturelle : continuité des services d’urgence',
+    subtitle: 'BTS détruite, transmission coupée, saturation, orage sur la station sol, diversité de stations sol',
+    duration: '2 h',
+    level: D2D_LEVEL,
+    tags: ['d2d'],
+    mode: 'diag',
+    context: '<p>Des pluies diluviennes frappent la région du Centre-Nord. Le réseau mobile compte trois BTS (Kaya, Pissila, Barsalogho) raccordées en fibre au cœur mobile, un satellite <b>Direct-to-Cell</b> et un <b>capteur de crue</b> relié à un satellite GEO en bande L. Le <b>centre de secours</b> doit rester joignable.</p><p>Vous êtes en mode <b>Diagnostic</b> : vous allez simuler les dégâts un par un et vérifier la continuité des services.</p>',
+    objectives: ['Vérifier la bascule automatique vers le satellite quand une BTS disparaît.', 'Distinguer une BTS détruite d’une BTS privée de transmission.', 'Évaluer l’effet de la saturation sur les services d’urgence.', 'Comprendre le point faible de la liaison de connexion et la diversité de stations sol.', 'Choisir un système satellite adapté à un capteur d’alerte.'],
+    releves: [['Réseau de Tél. sinistré avant / après la destruction de la BTS', ''], ['Réseau du secouriste après la coupure de la fibre', ''], ['SINR du secouriste sur le satellite', 'dB'], ['Services encore disponibles avec 600 utilisateurs', ''], ['C/N du feeder sous 80 mm/h', 'dB'], ['RTT du capteur de crue', 'ms']],
+    steps: [
+      {
+        title: 'Situation normale',
+        html: '<p>Vérifiez que les trois téléphones sont sur la 4G terrestre et que tous les flux vers le centre de secours sont « ok » (onglet Flux de trafic, sous le canevas).</p>',
+        question: 'Les liens directs vers le satellite sont gris (« veille ») : pourquoi le satellite n’est-il pas utilisé ?',
+        check: (api) => {
+          const all = ['Tél. Kaya', 'Tél. sinistré', 'Tél. secouriste'].every((n) => acc(api, n) === 'terrestre');
+          return { ok: all, msg: all ? 'Les trois téléphones sont sur la 4G ✔' : 'Un téléphone n’est pas sur la 4G : réparez le réseau terrestre.' };
+        },
+      },
+      {
+        title: 'La BTS de Pissila est détruite',
+        html: '<p>Sélectionnez la <b>BTS Pissila</b> et cochez <b>Simuler une panne</b>. Observez le journal et le lien de <b>Tél. sinistré</b>.</p>',
+        question: 'Que fait le téléphone ? Combien de temps l’abonné reste-t-il sans service ? Le SMS de détresse passe-t-il ?' + LB('Pourquoi la bascule est-elle automatique, sans action de l’abonné ? Quel identifiant de réseau la cellule satellite diffuse-t-elle ?'),
+        check: (api) => ({ ok: !!api.node('BTS Pissila').props.failed && acc(api, 'Tél. sinistré') === 'satellite', msg: !api.node('BTS Pissila').props.failed ? 'Simulez la panne de la BTS Pissila.' : `Tél. sinistré : ${acc(api, 'Tél. sinistré')}` }),
+      },
+      {
+        title: 'La fibre de Barsalogho est arrachée',
+        html: '<p>Avec l’outil <b>Couper</b> (ciseaux), coupez la fibre <b>BTS Barsalogho ↔ Cœur mobile</b>.</p>',
+        question: 'La BTS fonctionne encore : pourquoi le secouriste perd-il la 4G ? Que montre le bilan de son lien 4G ?',
+        check: (api) => {
+          const l = api.link('BTS Barsalogho', 'Cœur mobile');
+          return { ok: !!(l && l.props.cut) && acc(api, 'Tél. secouriste') === 'satellite', msg: !(l && l.props.cut) ? 'Coupez la fibre BTS Barsalogho ↔ Cœur mobile.' : `Secouriste : ${acc(api, 'Tél. secouriste')}` };
+        },
+      },
+      {
+        title: 'Tout le monde appelle en même temps',
+        html: '<p>Réglez les <b>autres utilisateurs actifs dans le faisceau</b> du satellite D2C à <b>600</b>. Observez les services du secouriste.</p>',
+        question: 'Quels services restent disponibles ? Pourquoi les SMS et l’alerte à la population résistent-ils mieux que la voix ?' + MB('Proposez des mécanismes réseau pour protéger les communications des secours (priorité d’accès, classes d’accès, QoS).'),
+        check: (api) => {
+          const s = d2dSt(api, 'Tél. secouriste', 'Satellite D2C');
+          const ok = Number(api.node('Satellite D2C').props.backgroundUsers) >= 500 && s && s.services.find((x) => x.id === 'sms').state === 'ok';
+          return { ok: !!ok, msg: Number(api.node('Satellite D2C').props.backgroundUsers) < 500 ? 'Réglez 600 utilisateurs dans le faisceau.' : `SMS : ${s ? s.services.find((x) => x.id === 'sms').state : '—'} · voix : ${s ? s.services.find((x) => x.id === 'voix').state : '—'}` };
+        },
+      },
+      {
+        title: 'Orage sur la station sol',
+        html: '<p>Remettez <b>120</b> utilisateurs. Cochez <b>Subit la pluie locale</b> sur la <b>Station sol NTN</b>, puis réglez la pluie à <b>80 mm/h</b>. Observez la liaison de connexion et les téléphones. Raccordez ensuite la <b>Station sol de secours</b> (déjà posée, hors de l’orage) au satellite D2C et au cœur mobile (fibre).</p>',
+        question: 'Pourquoi tous les téléphones sur satellite perdent-ils le service ? Comment la seconde station sol rétablit-elle la situation ?' + LB('Calculez l’atténuation de la pluie en bande Ka sur le trajet oblique (γ = k·R^α, L_s = (h_R − h_s)/sin E).'),
+        check: (api) => {
+          const feeders = api.links('feeder').filter((l) => l.state && l.state.up).length;
+          const ok = api.rain() >= 60 && !!api.node('Station sol NTN').props.localRain && feeders >= 2 && acc(api, 'Tél. secouriste') === 'satellite';
+          return { ok, msg: api.rain() < 60 || !api.node('Station sol NTN').props.localRain ? 'Faites pleuvoir 80 mm/h sur la station sol NTN.' : feeders < 2 ? 'Raccordez la station sol de secours au satellite D2C et au cœur mobile.' : `Secouriste : ${acc(api, 'Tél. secouriste')} ✔` };
+        },
+      },
+      {
+        title: 'Le capteur de crue',
+        html: '<p>Sous l’orage, sélectionnez le lien <b>Capteur de crue ↔ Satellite IoT GEO</b> (bilan, puis Profil &amp; Fresnel).</p>',
+        question: 'Le capteur transmet-il encore ? Pourquoi un satellite GEO avec un feeder en bande C est-il adapté à l’alerte de crue ? Quelle est sa latence ?',
+        check: (api) => ({ ok: acc(api, 'Capteur de crue') === 'satellite' && api.rain() >= 60, msg: `Capteur : ${acc(api, 'Capteur de crue')}${api.rain() < 60 ? ' · laissez la pluie à 80 mm/h' : ''}` }),
+      },
+    ],
+    conclusion: '<p>Le satellite Direct-to-Cell maintient les communications d’urgence quand des BTS sont détruites ou isolées, sans action des abonnés. Ses limites : la capacité partagée (la voix sature d’abord, les SMS et l’alerte résistent) et la liaison de connexion, sensible à la pluie en bande Ka, d’où la diversité de stations sol. Un capteur d’alerte gagne à utiliser un GEO toujours visible, avec un feeder en bande C.</p>',
+    build() {
+      const nodes = [];
+      const links = [];
+      d2dCore(nodes, links, 240, 800, { serverName: 'Centre de secours', sats: [{ name: 'Satellite D2C', x: 560, props: { profile: 'D2C_LTE', elevationDeg: 45, backgroundUsers: 120 } }, { name: 'Satellite IoT GEO', x: 980, props: { profile: 'IOT_GEO', backgroundUsers: 10 } }] });
+      nodes.push(
+        bts('BTS Kaya', 300, 470, '10.0.0.2'),
+        bts('BTS Pissila', 620, 470, '10.0.0.3'),
+        bts('BTS Barsalogho', 920, 470, '10.0.0.4'),
+        ue('Tél. Kaya', 330, 510, '10.45.0.21'),
+        ue('Tél. sinistré', 650, 510, '10.45.0.22'),
+        ue('Tél. secouriste', 950, 510, '10.45.0.23', { terminal: 'smartphoneHpue' }),
+        N('iotDevice', 'Capteur de crue', 1080, 560, { ip: '10.45.0.40', prefix: 24, gateway: '10.45.0.1', reportsPerDay: 96, payloadBytes: 30 }),
+        N('ntnGateway', 'Station sol de secours', 700, 860, {})
+      );
+      links.push(Lk('BTS Kaya', 'Cœur mobile', { capacityMbps: 10000 }, 'fiber'), Lk('BTS Pissila', 'Cœur mobile', { capacityMbps: 10000 }, 'fiber'), Lk('BTS Barsalogho', 'Cœur mobile', { capacityMbps: 10000 }, 'fiber'));
+      for (const [t, b] of [['Tél. Kaya', 'BTS Kaya'], ['Tél. sinistré', 'BTS Pissila'], ['Tél. secouriste', 'BTS Barsalogho']]) links.push(Lk(t, b), Lk(t, 'Satellite D2C'));
+      links.push(Lk('Capteur de crue', 'Satellite IoT GEO'));
+      return { settings: { scaleKm: 5, rainMmH: 0 }, nodes, links, flows: [Fl('Tél. sinistré', 'Centre de secours', 0.001, 'data', 'SMS de détresse'), Fl('Tél. secouriste', 'Centre de secours', 0.04, 'voice', 'Appel du secouriste'), Fl('Tél. Kaya', 'Centre de secours', 0.04, 'voice', 'Appel Kaya'), Fl('Capteur de crue', 'Centre de secours', 0.0001, 'data', 'Niveau de la rivière')] };
+    },
+  });
+
+  /* =================== TP 20 =================== */
+  LABS.push({
+    id: 'tp20',
+    
+    num: 'TP 20',
+    title: 'IoT-NTN : répétitions, stockage et retransmission, dix ans d’autonomie',
+    subtitle: 'Colliers de bétail au Sahel : bilan NB-IoT, masquage, pile, point GNSS, revisite, éphémérides',
+    duration: '2 h',
+    level: D2D_LEVEL,
+    tags: ['d2d'],
+    mode: 'design',
+    context: '<p>Une coopérative d’éleveurs du Sahel veut suivre ses troupeaux pendant la transhumance. Chaque zébu porte un <b>collier NB-IoT</b> qui envoie sa position par une petite constellation de <b>nanosatellites</b> en orbite basse, à <b>stockage et retransmission</b>. Contrainte : la pile (3,6 Ah) doit tenir <b>10 ans</b>.</p>',
+    objectives: ['Lire le bilan d’un objet NB-IoT et le rôle des répétitions.', 'Mesurer l’effet du masquage par la végétation.', 'Calculer l’autonomie d’un objet NTN et l’optimiser.', 'Relier la taille de la constellation au délai de livraison.', 'Comprendre le rôle du GNSS et des éphémérides dans la précompensation Doppler.'],
+    releves: [['SNR montant (1 tonalité 3,75 kHz)', 'dB'], ['Répétitions sous les arbres', ''], ['Autonomie avec 24 messages / jour', 'ans'], ['Messages par jour pour 10 ans', ''], ['Autonomie sans RAI / avec GNSS 30 s', 'ans'], ['Délai de livraison (6 satellites)', 'min'], ['Délai de livraison (24 satellites)', 'min'], ['Doppler résiduel (éphémérides de 12 h)', 'Hz']],
+    steps: [
+      {
+        title: 'Bilan d’un collier en terrain dégagé',
+        html: '<p>Sélectionnez le lien <b>Collier zébu ↔ Nanosatellites IoT</b>, onglet <b>Bilan de liaison</b>. Relevez le SINR descendant, le SNR montant (une tonalité de 3,75 kHz) et les débits.</p>',
+        question: 'Pourquoi le collier émet-il sur une seule sous-porteuse de 3,75 kHz plutôt que sur toute la bande de 180 kHz ? Calculez le gain en SNR.' + LB('Quel est le rôle de la technologie NB-IoT (couverture étendue, basse consommation) ?'),
+        check: (api) => {
+          const s = d2dSt(api, 'Collier zébu', 'Nanosatellites IoT');
+          return { ok: !!s && s.up && api.stats().tab_budget, msg: s ? `SNR montant ${f(s.result.ul.snrDb, 1)} dB${api.stats().tab_budget ? ' ✔' : ' · ouvrez l’onglet Bilan de liaison'}` : '—' };
+        },
+      },
+      {
+        title: 'Un zébu sous les arbres',
+        html: '<p>Décochez <b>Vue dégagée du ciel</b> sur le collier (masquage par la végétation). Relevez le SINR et le nombre de répétitions.</p><div class="formula">Gain des répétitions ≈ 0,85 × 10·log(R)</div>',
+        question: 'Combien de répétitions faut-il ? Quel est le coût pour la pile et pour la capacité du satellite ?' + MB('Retrouvez R à partir du SNR requis par le CQI 1 (−6,7 dB) et du SINR mesuré. Quel est le nombre maximal de répétitions en NB-IoT et quel affaiblissement de couplage maximal (MCL) en résulte ?'),
+        check: (api) => {
+          const s = d2dSt(api, 'Collier zébu', 'Nanosatellites IoT');
+          const ok = api.node('Collier zébu').props.los === false && s && s.result.dl.rate.reps > 1;
+          return { ok: !!ok, msg: api.node('Collier zébu').props.los !== false ? 'Décochez « Vue dégagée du ciel ».' : `Répétitions descendantes : ${s ? s.result.dl.rate.reps : '—'}` };
+        },
+      },
+      {
+        title: 'Viser dix ans d’autonomie',
+        html: '<p>Recochez la vue dégagée. Onglet <b>Profil &amp; Fresnel</b> du lien : relevez l’autonomie avec <b>24 messages par jour</b>. Réduisez les <b>messages par jour</b> jusqu’à atteindre <b>10 ans</b>.</p><div class="formula">Autonomie = 0,8 × C_pile / I_moyen</div>',
+        question: 'Combien de messages par jour au maximum ? Quel est le premier poste de consommation par message ?' + LB('Recalculez le courant moyen et l’autonomie pour la valeur retenue.'),
+        check: (api) => {
+          const n = api.node('Collier zébu');
+          const s = d2dSt(api, 'Collier zébu', 'Nanosatellites IoT');
+          if (!s) return { ok: false, msg: '—' };
+          const b = MBV.D2D.iotBattery({ capacityMAh: Number(n.props.capacityMAh), reportsPerDay: Number(n.props.reportsPerDay), payloadBytes: Number(n.props.payloadBytes), ulKbps: Math.max(0.01, s.result.ul.rate.kbps || s.result.ul.best.kbps), repetitions: s.result.ul.rate.reps || 1, gnssFixS: Number(n.props.gnssFixS), rai: n.props.rai !== false });
+          return { ok: b.years >= 10 && n.props.los !== false, msg: n.props.los === false ? 'Recochez la vue dégagée du ciel.' : `${n.props.reportsPerDay} messages/jour : ${f(b.years, 1)} ans${b.years >= 10 ? ' ✔' : ''}` };
+        },
+      },
+      {
+        title: 'Point GNSS et libération immédiate',
+        html: '<p>Décochez la <b>libération immédiate (RAI)</b>, puis passez la <b>durée du point GNSS</b> à <b>30 s</b> (démarrage à froid). Relevez l’autonomie à chaque fois, puis revenez à RAI cochée et 5 s.</p>',
+        question: 'Pourquoi un objet NTN doit-il faire un point GNSS avant d’émettre, contrairement à un objet NB-IoT terrestre ? Comment limiter son coût ?',
+        check: (api) => {
+          const p = api.node('Collier zébu').props;
+          return { ok: p.rai !== false && Number(p.gnssFixS) <= 5, msg: p.rai === false || Number(p.gnssFixS) > 5 ? 'Après vos essais, revenez à RAI cochée et 5 s de GNSS.' : 'RAI et GNSS 5 s ✔' };
+        },
+      },
+      {
+        title: 'Délai de livraison',
+        html: '<p>Onglet <b>Profil &amp; Fresnel</b> : relevez le nombre de passages par jour et le <b>délai de stockage et retransmission</b>. Sélectionnez le satellite et portez la constellation à <b>24 satellites</b>.</p>',
+        question: 'Comment évolue le délai ? Ce service convient-il au suivi du bétail ? À une alerte de vol de bétail ? Que proposeriez-vous pour une alerte ?' + MB('Établissez l’expression du délai moyen τ ≈ Δt/2 + T_orbite/(2·N_stations) et discutez ses hypothèses.'),
+        check: (api) => {
+          const n = Number(api.node('Nanosatellites IoT').props.satsTotal);
+          return { ok: n >= 24, msg: n >= 24 ? `${n} satellites ✔` : 'Portez la constellation à 24 satellites.' };
+        },
+      },
+      {
+        title: 'Des éphémérides périmées',
+        html: '<p>Réglez l’<b>âge des éphémérides</b> du collier à <b>43 200 s</b> (12 h). Observez la rubrique Doppler du bilan, puis revenez à <b>600 s</b>.</p>',
+        question: 'Pourquoi le satellite ne reçoit-il plus le collier ? Que doit faire le module pour éviter ce problème ?' + MB('Calculez le Doppler résiduel et comparez-le à la tolérance de ±0,1 ppm.'),
+        check: (api) => {
+          const a = Number(api.node('Collier zébu').props.ephemerisAgeS);
+          return { ok: a <= 3600 && acc(api, 'Collier zébu') === 'satellite', msg: a > 3600 ? 'Revenez à des éphémérides de 600 s.' : `Collier : ${acc(api, 'Collier zébu')}` };
+        },
+      },
+    ],
+    conclusion: '<p>Un objet NB-IoT par satellite fonctionne avec quelques centaines de mW grâce à une sous-porteuse très étroite et aux répétitions. Son autonomie dépend surtout du nombre de messages, du point GNSS imposé par le NTN et de la libération rapide de la connexion. Une petite constellation à stockage et retransmission livre les messages avec un délai d’une à plusieurs heures : adapté au suivi, pas à l’alerte.</p>',
+    build() {
+      const nodes = [];
+      const links = [];
+      d2dCore(nodes, links, 240, 800, { serverName: 'Plateforme IoT', sats: [{ name: 'Nanosatellites IoT', x: 560, props: { profile: 'IOT_LEO_SF', elevationDeg: 35, backgroundUsers: 10 } }] });
+      nodes.push(N('iotDevice', 'Collier zébu', 620, 520, { ip: '10.45.0.41', prefix: 24, gateway: '10.45.0.1', reportsPerDay: 24, payloadBytes: 40, capacityMAh: 3600, gnssFixS: 5 }));
+      links.push(Lk('Collier zébu', 'Nanosatellites IoT'));
+      return { settings: { scaleKm: 20, rainMmH: 0 }, nodes, links, flows: [Fl('Collier zébu', 'Plateforme IoT', 0.0001, 'data', 'Position du zébu')] };
+    },
+  });
+
+  /* =================== TP 21 =================== */
+  LABS.push({
+    id: 'tp21',
+    
+    num: 'TP 21',
+    title: 'Mobilité et véhicules : bascules, Doppler et handover',
+    subtitle: 'Camion et passager sur la route nationale : 4G → satellite → 4G, satellites défilants, grandes antennes',
+    duration: '2 h',
+    level: D2D_LEVEL,
+    tags: ['d2d'],
+    mode: 'design',
+    context: '<p>Un transporteur suit ses camions entre <b>Ouagadougou</b> et <b>Koupéla</b> (140 km). Entre les deux villes, la 4G est absente. Le <b>camion</b> dispose d’un module télématique avec antenne de toit ; un <b>passager</b> n’a que son smartphone dans l’habitacle. Les deux terminaux sont reliés aux BTS des deux villes et au satellite Direct-to-Cell.</p><p>Les terminaux se déplacent à 80 km/h quand l’<b>horloge de simulation</b> tourne (▶ dans la barre du canevas).</p>',
+    objectives: ['Observer les bascules automatiques entre cellules terrestres et satellite au cours d’un trajet.', 'Comparer un terminal à antenne extérieure et un smartphone dans un véhicule.', 'Observer le défilement des satellites, les handovers et le Doppler.', 'Comparer deux systèmes Direct-to-Device (continuité, débit).'],
+    releves: [['Distance de bascule 4G → satellite (camion)', 'km'], ['Distance de bascule 4G → satellite (passager)', 'km'], ['Débit par utilisateur du camion / du passager', 'kbit/s'], ['Doppler maximal (1 882 MHz)', 'kHz'], ['Handovers en 30 min', ''], ['Disponibilité du système à grandes antennes', '%']],
+    steps: [
+      {
+        title: 'Lancer le trajet',
+        html: '<p>Cliquez sur <b>▶</b> (vitesse <b>×60</b>). Les deux terminaux quittent Ouagadougou ; leur position sur le trajet est indiquée dans leurs paramètres. Surveillez le <b>Journal d’événements</b>.</p>',
+        question: 'À quelle distance de Ouagadougou le camion bascule-t-il sur le satellite ? Et le passager ? Expliquez la différence.' + LB('Retrouvez ces distances avec le rayon de couverture Okumura-Hata et les pertes de l’habitacle (8 dB) et du corps (3 dB).'),
+        check: (api) => {
+          const r = api.routeKm('Camion');
+          return { ok: !!r && r.s >= 25, msg: r ? `Camion à ${f(r.s, 1)} km de Ouagadougou${r.s >= 25 ? ' ✔' : ' : laissez tourner l’horloge'}` : '—' };
+        },
+      },
+      {
+        title: 'Sur le satellite, en pleine brousse',
+        html: '<p>Arrêtez l’horloge quand les deux terminaux sont à mi-parcours. Comparez les bilans et les services du camion et du passager.</p>',
+        question: 'Quel terminal a le meilleur service ? Pourquoi les constructeurs de camions et les services d’urgence (appel d’urgence automatique) installent-ils une antenne de toit ?',
+        check: (api) => {
+          const r = api.routeKm('Camion');
+          return { ok: !!r && r.s >= 40 && r.s <= 100 && acc(api, 'Camion') === 'satellite', msg: r ? `Camion à ${f(r.s, 0)} km : ${acc(api, 'Camion')}` : '—' };
+        },
+      },
+      {
+        title: 'Arrivée à Koupéla',
+        html: '<p>Relancez l’horloge jusqu’à l’arrivée (140 km, ≈ 1 h 45 de trajet) et observez le retour sur la 4G.</p>',
+        question: 'Le camion revient-il sur la 4G à l’approche de Koupéla ? Pourquoi est-ce important pour l’opérateur et pour l’abonné ?',
+        check: (api) => {
+          const r = api.routeKm('Camion');
+          return { ok: !!r && r.s >= 125 && acc(api, 'Camion') === 'terrestre', msg: r ? `Camion à ${f(r.s, 0)} km : ${acc(api, 'Camion')}` : '—' };
+        },
+      },
+      {
+        title: 'Des satellites qui défilent',
+        html: '<p>Réglez le <b>mouvement</b> du satellite D2C sur <b>Défilement réel</b>, ramenez le temps à mi-parcours si besoin et relancez l’horloge pendant 30 minutes simulées. Ouvrez l’onglet <b>Profil &amp; Fresnel</b> du lien direct du camion.</p>',
+        question: 'Combien de handovers en 30 minutes ? Quel est le Doppler maximal ? Pourquoi le satellite le précompense-t-il au centre de chaque faisceau pour un smartphone ordinaire ?' + MB('Calculez le Doppler différentiel dans un faisceau de 30 km et la dérive Doppler au zénith ; comparez à l’espacement des sous-porteuses (15 kHz).'),
+        check: (api) => {
+          const h = api.satHistory('Satellite D2C');
+          return { ok: api.node('Satellite D2C').props.motion === 'moving' && !!h && h.handovers >= 1, msg: api.node('Satellite D2C').props.motion !== 'moving' ? 'Passez le satellite en défilement réel.' : `Handovers : ${h ? h.handovers : 0}` };
+        },
+      },
+      {
+        title: 'Un autre système : les grandes antennes',
+        html: '<p>Changez le système du satellite pour <b>Haut débit direct, grandes antennes</b> (position figée). Comparez le débit et le tableau des services du camion à mi-parcours.</p>',
+        question: 'Le débit augmente-t-il ? Pourquoi les services temps réel deviennent-ils impossibles alors que la télémétrie reste « différée » ?' + LB('Comparez la disponibilité des deux systèmes (nombre de satellites, satellites nécessaires pour une couverture continue).'),
+        check: (api) => {
+          const s = d2dSt(api, 'Camion', 'Satellite D2C');
+          return { ok: api.node('Satellite D2C').props.profile === 'D2D_BB' && !!s, msg: api.node('Satellite D2C').props.profile !== 'D2D_BB' ? 'Choisissez le système à grandes antennes.' : `Disponibilité ${s ? f(s.coverage.availability * 100, 0) : '—'} %` };
+        },
+      },
+    ],
+    conclusion: '<p>Un terminal en mouvement passe automatiquement de la 4G terrestre au satellite puis revient sur la 4G : le réseau terrestre reste prioritaire. L’antenne de toit d’un véhicule gagne une dizaine de dB sur un smartphone dans l’habitacle, ce qui prolonge la couverture et améliore le service satellite. Les satellites défilent : handovers toutes les quelques minutes et Doppler de ±44 kHz, précompensé par le satellite. Un système à très grandes antennes offre plus de débit, mais tant qu’il compte peu de satellites, il n’assure que des services différés.</p>',
+    build() {
+      const nodes = [];
+      const links = [];
+      d2dCore(nodes, links, 260, 800, { sats: [{ name: 'Satellite D2C', x: 620, props: { profile: 'D2C_LTE', elevationDeg: 55 } }] });
+      nodes.push(
+        bts('BTS Ouagadougou', 240, 450, '10.0.0.2'),
+        bts('BTS Koupéla', 800, 450, '10.0.0.3'),
+        N('vehicle', 'Camion', 240, 458, { ip: '10.45.0.31', prefix: 24, gateway: '10.45.0.1', antenna: 'toit', motion: 'route', routeKm: 140, routeHeadingDeg: 90, speedKmh: 80 }),
+        ue('Passager', 240, 466, '10.45.0.32', { environment: 'vehicule', motion: 'route', routeKm: 140, routeHeadingDeg: 90, speedKmh: 80 })
+      );
+      links.push(Lk('BTS Ouagadougou', 'Cœur mobile', { capacityMbps: 10000 }, 'fiber'), Lk('BTS Koupéla', 'Cœur mobile', { capacityMbps: 10000 }, 'fiber'));
+      for (const t of ['Camion', 'Passager']) links.push(Lk(t, 'BTS Ouagadougou'), Lk(t, 'BTS Koupéla'), Lk(t, 'Satellite D2C'));
+      return { settings: { scaleKm: 12.5, rainMmH: 0 }, nodes, links, flows: [Fl('Camion', 'Serveur opérateur', 0.002, 'data', 'Suivi de flotte'), Fl('Passager', 'Serveur opérateur', 0.04, 'voice', 'Appel du passager')] };
+    },
+  });
+
+  /* --- Direct-to-Device : scénarios d'usage opérateur mobile --- */
+  /**
+   * Cœur d'un opérateur mobile : cœur EPC/5GC, serveur, station sol NTN (fibre) et,
+   * si demandé, un satellite D2D relié par sa liaison de connexion.
+   * Plan d'adressage : terminaux mobiles 10.45.0.0/24 (pool du cœur), serveurs 10.0.0.0/24.
+   */
+  function d2dCore(nodes, links, x, y, opts = {}) {
+    nodes.push(
+      N('mobileCore', 'Cœur mobile', x, y, { loopback: '10.255.0.1' }),
+      N('server', opts.serverName || 'Serveur opérateur', x - 150, y + 90, { ip: '10.0.0.10', prefix: 24, gateway: '10.0.0.1' }),
+      N('ntnGateway', 'Station sol NTN', x + 170, y + 40, {})
+    );
+    links.push(Lk('Cœur mobile', opts.serverName || 'Serveur opérateur', {}, 'ethernet'), Lk('Station sol NTN', 'Cœur mobile', { capacityMbps: 10000 }, 'fiber'));
+    for (const sat of opts.sats || []) {
+      nodes.push(N('d2dSat', sat.name, sat.x, 200, sat.props));
+      links.push(Lk(sat.name, 'Station sol NTN'));
+    }
+  }
+  const ue = (name, x, y, ip, props) => N('ue', name, x, y, Object.assign({ ip, prefix: 24, gateway: '10.45.0.1' }, props || {}));
+  const bts = (name, x, y, ip, props) => N('gnodeb', name, x, y, Object.assign({ ip, prefix: 24, gateway: '10.0.0.1' }, props || {}));
+
+  /** Zone blanche rurale : un village couvert par la 4G, un hameau et un berger hors couverture. */
+  function exD2dZoneBlanche() {
+    const nodes = [];
+    const links = [];
+    d2dCore(nodes, links, 260, 780, { sats: [{ name: 'Satellite D2C', x: 640, props: { profile: 'D2C_LTE', elevationDeg: 50 } }] });
+    nodes.push(
+      bts('BTS Ziniaré', 260, 470, '10.0.0.2'),
+      ue('Tél. village', 300, 500, '10.45.0.21'),
+      ue('Tél. hameau', 640, 460, '10.45.0.22'),
+      ue('Tél. berger', 860, 560, '10.45.0.23', { terminal: 'smartphone' })
+    );
+    links.push(Lk('BTS Ziniaré', 'Cœur mobile', { capacityMbps: 10000 }, 'fiber'));
+    for (const t of ['Tél. village', 'Tél. hameau', 'Tél. berger']) links.push(Lk(t, 'BTS Ziniaré'), Lk(t, 'Satellite D2C'));
+    const flows = [Fl('Tél. village', 'Serveur opérateur', 0.04, 'voice', 'Appel village'), Fl('Tél. hameau', 'Serveur opérateur', 0.04, 'voice', 'Appel hameau'), Fl('Tél. berger', 'Serveur opérateur', 0.001, 'data', 'SMS berger')];
+    return { settings: { title: 'Exemple — Zone blanche rurale (Direct-to-Cell)', scaleKm: 10, rainMmH: 0 }, nodes, links, flows };
+  }
+
+  /** Catastrophe naturelle : inondation, deux BTS hors service, alerte et secours par satellite. */
+  function exD2dCatastrophe() {
+    const nodes = [];
+    const links = [];
+    d2dCore(nodes, links, 240, 800, {
+      serverName: 'Centre de secours',
+      sats: [
+        { name: 'Satellite D2C', x: 560, props: { profile: 'D2C_LTE', elevationDeg: 45, backgroundUsers: 120 } },
+        { name: 'Satellite IoT GEO', x: 980, props: { profile: 'IOT_GEO', backgroundUsers: 10 } },
+      ],
+    });
+    nodes.push(
+      bts('BTS Kaya', 300, 470, '10.0.0.2'),
+      bts('BTS Pissila', 620, 470, '10.0.0.3', { failed: true }),
+      bts('BTS Barsalogho', 920, 470, '10.0.0.4'),
+      ue('Tél. Kaya', 330, 510, '10.45.0.21'),
+      ue('Tél. sinistré Pissila', 650, 520, '10.45.0.22'),
+      ue('Tél. secouriste', 950, 520, '10.45.0.23', { terminal: 'smartphoneHpue' }),
+      N('iotDevice', 'Capteur de crue', 1080, 560, { ip: '10.45.0.40', prefix: 24, gateway: '10.45.0.1', reportsPerDay: 96, payloadBytes: 30 })
+    );
+    links.push(
+      Lk('BTS Kaya', 'Cœur mobile', { capacityMbps: 10000 }, 'fiber'),
+      Lk('BTS Pissila', 'Cœur mobile', { capacityMbps: 10000 }, 'fiber'),
+      Lk('BTS Barsalogho', 'Cœur mobile', { capacityMbps: 10000, cut: true }, 'fiber'),
+      Lk('Tél. Kaya', 'BTS Kaya'),
+      Lk('Tél. Kaya', 'Satellite D2C'),
+      Lk('Tél. sinistré Pissila', 'BTS Pissila'),
+      Lk('Tél. sinistré Pissila', 'Satellite D2C'),
+      Lk('Tél. secouriste', 'BTS Barsalogho'),
+      Lk('Tél. secouriste', 'Satellite D2C'),
+      Lk('Capteur de crue', 'Satellite IoT GEO')
+    );
+    const flows = [
+      Fl('Tél. sinistré Pissila', 'Centre de secours', 0.001, 'data', 'SMS de détresse'),
+      Fl('Tél. secouriste', 'Centre de secours', 0.04, 'voice', 'Appel du secouriste'),
+      Fl('Capteur de crue', 'Centre de secours', 0.0001, 'data', 'Niveau de la rivière'),
+      Fl('Tél. Kaya', 'Centre de secours', 0.04, 'voice', 'Appel Kaya'),
+    ];
+    return { settings: { title: 'Exemple — Catastrophe naturelle : secours par satellite', scaleKm: 5, rainMmH: 0 }, nodes, links, flows };
+  }
+
+  /** Déplacement hors couverture : un véhicule et un passager sur la route Ouagadougou → Koupéla. */
+  function exD2dTrajet() {
+    const nodes = [];
+    const links = [];
+    d2dCore(nodes, links, 260, 800, { sats: [{ name: 'Satellite D2C', x: 620, props: { profile: 'D2C_LTE', elevationDeg: 55 } }] });
+    nodes.push(
+      bts('BTS Ouagadougou', 240, 450, '10.0.0.2'),
+      bts('BTS Koupéla', 800, 450, '10.0.0.3'),
+      N('vehicle', 'Camion (antenne de toit)', 240, 462, { ip: '10.45.0.31', prefix: 24, gateway: '10.45.0.1', antenna: 'toit', motion: 'route', routeKm: 140, routeHeadingDeg: 90, speedKmh: 80 }),
+      ue('Tél. du passager', 240, 480, '10.45.0.32', { environment: 'vehicule', motion: 'route', routeKm: 140, routeHeadingDeg: 90, speedKmh: 80 })
+    );
+    links.push(Lk('BTS Ouagadougou', 'Cœur mobile', { capacityMbps: 10000 }, 'fiber'), Lk('BTS Koupéla', 'Cœur mobile', { capacityMbps: 10000 }, 'fiber'));
+    for (const t of ['Camion (antenne de toit)', 'Tél. du passager']) links.push(Lk(t, 'BTS Ouagadougou'), Lk(t, 'BTS Koupéla'), Lk(t, 'Satellite D2C'));
+    const flows = [Fl('Camion (antenne de toit)', 'Serveur opérateur', 0.002, 'data', 'Suivi de flotte'), Fl('Tél. du passager', 'Serveur opérateur', 0.04, 'voice', 'Appel du passager')];
+    return { settings: { title: 'Exemple — Déplacement hors couverture (route nationale)', scaleKm: 12.5, rainMmH: 0 }, nodes, links, flows };
+  }
+
+  /** IoT au Sahel : colliers de bétail (LEO à stockage et retransmission) et station hydrologique (GEO). */
+  function exD2dIotSahel() {
+    const nodes = [];
+    const links = [];
+    d2dCore(nodes, links, 240, 800, {
+      serverName: 'Plateforme IoT',
+      sats: [
+        { name: 'Nanosatellites IoT', x: 520, props: { profile: 'IOT_LEO_SF', elevationDeg: 35, backgroundUsers: 10 } },
+        { name: 'Satellite IoT GEO', x: 960, props: { profile: 'IOT_GEO', backgroundUsers: 10 } },
+      ],
+    });
+    const iot = (name, x, y, ip, props) => N('iotDevice', name, x, y, Object.assign({ ip, prefix: 24, gateway: '10.45.0.1' }, props));
+    nodes.push(
+      iot('Collier zébu 1', 480, 500, '10.45.0.41', { reportsPerDay: 4, payloadBytes: 40, capacityMAh: 3600, gnssFixS: 8 }),
+      iot('Collier zébu 2', 600, 560, '10.45.0.42', { reportsPerDay: 48, payloadBytes: 40, capacityMAh: 3600, gnssFixS: 8, los: false }),
+      iot('Station hydrologique', 960, 520, '10.45.0.43', { reportsPerDay: 96, payloadBytes: 60, capacityMAh: 19000, gnssFixS: 3 })
+    );
+    links.push(Lk('Collier zébu 1', 'Nanosatellites IoT'), Lk('Collier zébu 2', 'Nanosatellites IoT'), Lk('Station hydrologique', 'Satellite IoT GEO'));
+    const flows = ['Collier zébu 1', 'Collier zébu 2', 'Station hydrologique'].map((n) => Fl(n, 'Plateforme IoT', 0.0001, 'data', n + ' → plateforme'));
+    return { settings: { title: 'Exemple — IoT au Sahel (bétail, hydrologie)', scaleKm: 20, rainMmH: 0 }, nodes, links, flows };
+  }
+
+  /** Véhicules connectés : flotte de camions sur un corridor, appel d'urgence et suivi. */
+  function exD2dVehicules() {
+    const nodes = [];
+    const links = [];
+    d2dCore(nodes, links, 240, 820, {
+      serverName: 'Centre de gestion de flotte',
+      sats: [{ name: 'Satellite D2D grandes antennes', x: 640, props: { profile: 'D2D_BB', elevationDeg: 60, backgroundUsers: 10 } }],
+    });
+    nodes.push(
+      bts('BTS Bobo-Dioulasso', 240, 450, '10.0.0.2'),
+      N('vehicle', 'Camion 1 (télématique)', 260, 500, { ip: '10.45.0.51', prefix: 24, gateway: '10.45.0.1', antenna: 'toit', motion: 'route', routeKm: 200, routeHeadingDeg: 100, speedKmh: 70 }),
+      N('vehicle', 'Camion 2 (smartphone)', 260, 580, { ip: '10.45.0.52', prefix: 24, gateway: '10.45.0.1', antenna: 'interieur', motion: 'route', routeKm: 200, routeHeadingDeg: 100, speedKmh: 70 }),
+      N('vehicle', 'Ambulance', 520, 660, { ip: '10.45.0.53', prefix: 24, gateway: '10.45.0.1', antenna: 'toit' })
+    );
+    links.push(Lk('BTS Bobo-Dioulasso', 'Cœur mobile', { capacityMbps: 10000 }, 'fiber'));
+    for (const t of ['Camion 1 (télématique)', 'Camion 2 (smartphone)', 'Ambulance']) links.push(Lk(t, 'BTS Bobo-Dioulasso'), Lk(t, 'Satellite D2D grandes antennes'));
+    const flows = [
+      Fl('Camion 1 (télématique)', 'Centre de gestion de flotte', 0.005, 'data', 'Position et télémétrie'),
+      Fl('Camion 2 (smartphone)', 'Centre de gestion de flotte', 0.04, 'voice', 'Appel du chauffeur'),
+      Fl('Ambulance', 'Centre de gestion de flotte', 0.5, 'video', 'Télémédecine (vidéo)'),
+    ];
+    return { settings: { title: 'Exemple — Véhicules connectés sur un corridor', scaleKm: 12.5, rainMmH: 0 }, nodes, links, flows };
+  }
+
   const EXAMPLES = [
     { id: 'ex-backhaul', num: 'Ex 1', title: 'Backhaul FH d’un site 4G', subtitle: 'Deux bonds en cascade : 7 GHz sur 30 km, 15 GHz sur 12 km', tags: ['fh'], mode: 'design', desc: '<p>Un site 4G est raccordé au cœur de réseau par deux bonds : un long bond <b>7 GHz</b> (paraboles 1,2 m) jusqu’au relais, puis un bond court <b>15 GHz</b> (0,6 m). Comparez les deux bilans, faites pleuvoir : lequel se dégrade le premier ? Pourquoi a-t-on choisi deux bandes différentes ?</p>', build: exBackhaul },
     { id: 'ex-recette', num: 'Ex 2', title: 'Recette du backhaul (mesures réalistes)', subtitle: 'Fiche et rapport de recette ; une liaison n’est pas conforme', tags: ['fh'], mode: 'diag', desc: '<p>Le même réseau, en <b>recette réaliste</b> : chaque liaison réelle s’écarte un peu du calcul, comme sur le terrain. Relevez le RSL mesuré de chaque sens, remplissez la <b>fiche de recette</b> (onglet Bilan de liaison, sans sélection) et concluez. Une liaison est <b>non conforme</b> : trouvez la cause et intervenez (mode Dépannage), puis imprimez le rapport de recette.</p>', build: exRecette },
     { id: 'ex-vsat', num: 'Ex 3', title: 'Réseau VSAT en étoile', subtitle: 'Un téléport, trois stations : banque, école, mine', tags: ['vsat'], mode: 'design', desc: '<p>Trois sites isolés reliés à Internet par satellite GEO en bande Ku. Les paraboles n’ont pas le même diamètre ni les BUC la même puissance : comparez PIRE, Eb/N0, MODCOD et débits. Que se passe-t-il pour chaque site en bande Ka sous un orage ?</p>', build: exVsatEtoile },
     { id: 'ex-wisp', num: 'Ex 4', title: 'BLR 5,8 GHz à trois secteurs', subtitle: 'Fournisseur d’accès rural : 3 secteurs de 120°, 6 abonnés', tags: ['blr'], mode: 'design', desc: '<p>Un pylône porte trois stations de base sectorielles orientées à 0°, 120° et 240°. Observez l’écart de chaque CPE à l’axe de son secteur, le partage du débit entre abonnés et la portée. Déplacez un abonné hors de son secteur, ou loin du pylône.</p>', build: exWisp },
     { id: 'ex-leo', num: 'Ex 5', title: 'Constellation LEO en défilement', subtitle: 'Handovers, Doppler et latence d’une orbite basse', tags: ['vsat'], mode: 'design', desc: '<p>La topologie du TP 13, sans consignes : lancez l’horloge de simulation (▶) et observez les passages des satellites, les handovers, le Doppler et la latence. Réduisez le nombre de satellites par plan pour faire apparaître des trous de couverture.</p>', build: () => LABS.find((l) => l.id === 'tp13').build() },
+    { id: 'ex-d2d-zone-blanche', num: 'Ex 6', title: 'Zone blanche rurale : Direct-to-Cell', subtitle: 'Village couvert en 4G, hameau et berger hors couverture : bascule sur le satellite', tags: ['d2d'], mode: 'design', desc: '<p>Une BTS 4G rurale couvre le village (≈ 14 km) ; le hameau et le berger sont en <b>zone blanche</b>. Leurs smartphones ordinaires se rattachent à la <b>cellule satellite</b> Direct-to-Cell de l’opérateur. Comparez le RSRP terrestre et satellite, le débit par utilisateur et le tableau des <b>services progressifs</b>. Augmentez les « autres utilisateurs actifs dans le faisceau » du satellite (300, 1 000) : quels services disparaissent en premier ? Passez le satellite en défilement réel et lancez l’horloge.</p>', build: exD2dZoneBlanche },
+    { id: 'ex-d2d-catastrophe', num: 'Ex 7', title: 'Catastrophe naturelle : secours par satellite', subtitle: 'Inondation : une BTS détruite, une BTS privée de transmission, capteur de crue', tags: ['d2d'], mode: 'diag', desc: '<p>Après une inondation, la BTS de Pissila est <b>hors service</b> et la fibre de la BTS de Barsalogho est <b>coupée</b> : sa cellule n’émet plus. Les téléphones basculent sur le satellite ; le SMS de détresse et l’appel du secouriste passent encore. Le capteur de crue transmet par un satellite GEO en bande L. Réparez la BTS (case « Simuler une panne ») ou la fibre (ciseaux) et observez le retour sur le réseau terrestre. Que se passe-t-il si un orage frappe la station sol NTN (« Subit la pluie locale ») ?</p>', build: exD2dCatastrophe },
+    { id: 'ex-d2d-trajet', num: 'Ex 8', title: 'Déplacement hors couverture', subtitle: 'Route nationale : bascule 4G → satellite → 4G pendant le trajet', tags: ['d2d'], mode: 'design', desc: '<p>Un camion (antenne de toit) et un passager (smartphone dans l’habitacle) roulent à 80 km/h de Ouagadougou vers Koupéla (140 km). Lancez l’horloge (▶, ×60) : le journal note chaque <b>bascule</b> entre la cellule terrestre et la cellule satellite. Comparez les services du camion et du passager : quel est l’effet des 8 dB de pertes de l’habitacle ? Changez le seuil de bascule du cœur mobile, ou la vitesse.</p>', build: exD2dTrajet },
+    { id: 'ex-d2d-iot-sahel', num: 'Ex 9', title: 'IoT au Sahel : bétail et hydrologie', subtitle: 'NB-IoT par nanosatellites (stockage et retransmission) et par GEO bande L', tags: ['d2d'], mode: 'design', desc: '<p>Deux colliers de zébus envoient leur position par une petite constellation de <b>nanosatellites</b> : le message attend le passage d’un satellite (<b>stockage et retransmission</b>). La station hydrologique utilise un <b>satellite GEO</b> en bande L, toujours visible. Le collier 2 est sous les arbres (vue du ciel masquée) et émet toutes les 30 min : que montrent son bilan et son flux ? Comparez dans l’onglet Profil le délai de livraison et l’<b>autonomie de la pile</b> : combien de messages par jour pour tenir 10 ans ? Effet du point GNSS, de la RAI et des répétitions ?</p>', build: exD2dIotSahel },
+    { id: 'ex-d2d-vehicules', num: 'Ex 10', title: 'Véhicules connectés sur un corridor', subtitle: 'Télématique, appel du chauffeur, télémédecine depuis une ambulance', tags: ['d2d'], mode: 'design', desc: '<p>Une flotte quitte Bobo-Dioulasso : un camion à module télématique (antenne de toit), un camion dont le chauffeur n’a que son smartphone, une ambulance qui transmet de la vidéo. Le système satellite à <b>grandes antennes</b> offre plus de débit mais ne compte encore que quelques satellites : couverture <b>intermittente</b>. Quels services sont garantis, lesquels sont seulement « différés » ? Passez au système Direct-to-Cell et comparez.</p>', build: exD2dVehicules },
   ];
 
   MBV.Labs = { list: LABS, examples: EXAMPLES };
@@ -2051,6 +2637,154 @@
     <text x="470" y="50" fill="#a9b8d3">IDLE : le lien RPL est bloqué</text><text x="470" y="66" fill="#a9b8d3">→ pas de boucle Ethernet</text>
     <text x="470" y="150" fill="#fcd34d">Panne d’un bond :</text><text x="470" y="166" fill="#fcd34d">RPL débloqué en &lt; 50 ms</text>
   </svg><figcaption>Anneau Ethernet protégé par ERPS (ITU-T G.8032).</figcaption></figure>`;
+
+  const FIG_D2D_ARCHI = `<figure><svg viewBox="0 0 600 250" width="600" xmlns="http://www.w3.org/2000/svg" font-family="sans-serif" font-size="11">
+    <rect x="0" y="0" width="600" height="70" fill="#0b1030"/><text x="10" y="16" fill="#7587a8">segment spatial (LEO 350 à 600 km, ou GEO)</text>
+    <g fill="#16213a" stroke="#a3e635"><rect x="250" y="22" width="100" height="34" rx="6"/></g><text x="300" y="38" fill="#e2e8f0" text-anchor="middle">Satellite D2D</text><text x="300" y="51" fill="#a3e635" text-anchor="middle" font-size="9">antenne réseau 6 à 220 m²</text>
+    <line x1="270" y1="56" x2="90" y2="160" stroke="#22c55e" stroke-width="2" stroke-dasharray="6 4 1 4"/><text x="120" y="100" fill="#a3e635">lien direct (bande opérateur ou L/S)</text>
+    <line x1="330" y1="56" x2="470" y2="160" stroke="#a78bfa" stroke-width="2" stroke-dasharray="2 5"/><text x="420" y="100" fill="#c4b5fd">liaison de connexion (Ka, C)</text>
+    <rect x="40" y="160" width="100" height="40" rx="6" fill="#16213a" stroke="#a3e635"/><text x="90" y="178" fill="#e2e8f0" text-anchor="middle">smartphone, IoT,</text><text x="90" y="192" fill="#e2e8f0" text-anchor="middle">véhicule</text>
+    <rect x="420" y="160" width="100" height="40" rx="6" fill="#16213a" stroke="#a78bfa"/><text x="470" y="184" fill="#e2e8f0" text-anchor="middle">Station sol NTN</text>
+    <line x1="470" y1="200" x2="470" y2="222" stroke="#fb923c" stroke-width="2"/><rect x="400" y="222" width="150" height="24" rx="5" fill="#16213a" stroke="#f472b6"/><text x="475" y="238" fill="#e2e8f0" text-anchor="middle">Cœur mobile EPC / 5GC</text>
+    <rect x="190" y="200" width="90" height="34" rx="6" fill="#16213a" stroke="#22d3ee"/><text x="235" y="221" fill="#e2e8f0" text-anchor="middle">BTS terrestre</text>
+    <line x1="140" y1="190" x2="190" y2="214" stroke="#22d3ee" stroke-dasharray="8 5"/><line x1="280" y1="226" x2="400" y2="234" stroke="#fb923c" stroke-width="2"/>
+    <text x="10" y="246" fill="#7587a8">Le terminal reste sur la BTS tant qu’elle le couvre ; au-delà, il se rattache à la cellule satellite.</text>
+  </svg><figcaption>Architecture Direct-to-Device : le satellite est une « cellule de plus » de l’opérateur mobile.</figcaption></figure>`;
+
+  const FIG_DOPPLER_S = `<figure><svg viewBox="0 0 560 190" width="560" xmlns="http://www.w3.org/2000/svg" font-family="sans-serif" font-size="11">
+    <line x1="50" y1="95" x2="530" y2="95" stroke="#334155"/><line x1="50" y1="15" x2="50" y2="175" stroke="#334155"/>
+    <path d="M60 25 C200 30, 240 60, 290 95 S380 160, 520 165" fill="none" stroke="#a3e635" stroke-width="2.5"/>
+    <path d="M60 170 C180 120, 230 30, 290 25 S400 120, 520 170" fill="none" stroke="#22d3ee" stroke-width="1.6"/>
+    <text x="56" y="22" fill="#a3e635">+44 kHz (le satellite se rapproche)</text><text x="330" y="182" fill="#a3e635">−44 kHz (il s’éloigne)</text>
+    <text x="300" y="22" fill="#22d3ee">élévation maximale</text><text x="296" y="110" fill="#e2e8f0">Doppler nul, dérive maximale ≈ 640 Hz/s</text>
+    <text x="480" y="90" fill="#7587a8">temps</text><text x="8" y="100" fill="#7587a8">0</text>
+  </svg><figcaption>Courbe en S du Doppler pendant un passage de 4 à 5 minutes (1,9 GHz, 525 km).</figcaption></figure>`;
+
+  const FIG_D2D_SERVICES = `<figure><svg viewBox="0 0 560 170" width="560" xmlns="http://www.w3.org/2000/svg" font-family="sans-serif" font-size="11">
+    <g stroke="#0a0f1c"><rect x="30" y="120" width="120" height="40" fill="#22c55e"/><rect x="155" y="90" width="120" height="70" fill="#84cc16"/><rect x="280" y="55" width="120" height="105" fill="#eab308"/><rect x="405" y="20" width="125" height="140" fill="#f97316"/></g>
+    <g fill="#0a0f1c" font-weight="bold" text-anchor="middle"><text x="90" y="138">1. SMS, alertes</text><text x="215" y="108">2. Messagerie, IoT</text><text x="340" y="73">3. Voix, données</text><text x="467" y="38">4. Haut débit</text></g>
+    <g fill="#0a0f1c" text-anchor="middle" font-size="10"><text x="90" y="152">SNR ≥ −15 dB · 1 kbit/s</text><text x="215" y="124">SNR ≥ −6 dB · 16 kbit/s</text><text x="340" y="89">SNR ≥ −4 dB · 40 kbit/s</text><text x="467" y="54">SNR ≥ 5 dB · 2 Mbit/s</text></g>
+  </svg><figcaption>Services progressifs : chaque marche demande plus de signal, plus de débit par utilisateur et une couverture continue.</figcaption></figure>`;
+
+  const COURSE_D2D = {
+    id: 'd2d',
+    title: 'Direct-to-Device : satellite vers mobile et IoT (NTN)',
+    intro: '<p>Le <b>Direct-to-Device</b> (D2D), ou <b>Direct-to-Cell</b> (D2C), relie un satellite directement à un <b>smartphone ordinaire</b>, à un <b>objet connecté</b> ou à un <b>véhicule</b>, sans parabole ni terminal spécial. Pour un opérateur mobile, le satellite devient une cellule de plus de son réseau, là où aucune BTS n’est rentable ou disponible. La 3GPP l’a normalisé sous le nom de <b>NTN</b> (Non-Terrestrial Networks) à partir de la Release 17. Les encadrés <b>Licence</b> et <b>Master / ingénieur</b> approfondissent chaque notion ; le cœur du chapitre est accessible au Bac Pro.</p>',
+    sections: [
+      {
+        id: 'd2d-pourquoi',
+        title: 'Pourquoi le Direct-to-Device ?',
+        html: `<p>En Afrique de l’Ouest, la 4G couvre les villes et les grands axes, mais de vastes <b>zones blanches</b> subsistent : une BTS rurale coûte cher (pylône, énergie solaire, transmission) pour peu d’abonnés. Le satellite direct comble ces trous sans changer de téléphone.</p>
+          <table><tr><th>Usage</th><th>Exemple</th><th>Service visé</th></tr>
+          <tr><td>Zones blanches et rurales</td><td>Hameau, berger transhumant, site minier</td><td>SMS, messagerie, voix</td></tr>
+          <tr><td>Urgences et catastrophes</td><td>Inondation, BTS détruites ou sans transmission</td><td>Alerte à la population, SMS de détresse, appel des secours</td></tr>
+          <tr><td>Déplacements hors couverture</td><td>Route nationale, fleuve, désert</td><td>Continuité de service, bascule automatique</td></tr>
+          <tr><td>Services progressifs</td><td>Offre lancée par étapes</td><td>SMS → messagerie → voix → données</td></tr>
+          <tr><td>Objets connectés et véhicules</td><td>Bétail, capteurs de crue, flottes de camions, ambulances</td><td>Messages IoT, télématique, appel d’urgence</td></tr></table>
+          <p>Modèle économique : l’opérateur mobile signe un <b>accord</b> avec un opérateur de satellites ; il lui prête une partie de son spectre (Direct-to-Cell) ou ses abonnés <b>itinèrent</b> sur le réseau satellite. Le réseau terrestre reste <b>prioritaire</b> : le satellite ne sert que lorsqu’aucune cellule terrestre n’est utilisable.</p>
+          <div class="lvl-box licence"><b>Licence</b> — Le D2D ne remplace pas la BTS : une cellule satellite de plusieurs dizaines de kilomètres de diamètre partage quelques Mbit/s entre tous ses abonnés, contre plusieurs dizaines de Mbit/s pour une cellule terrestre de quelques km². C’est un service de <b>couverture</b>, pas de <b>capacité</b>.</div>
+          <p>À explorer : exemples 6 (zone blanche) et 7 (catastrophe) dans la fenêtre Travaux Pratiques, onglet Exemples.</p>`,
+      },
+      {
+        id: 'd2d-familles',
+        title: 'Deux familles : spectre de l’opérateur ou bandes satellitaires',
+        html: `<table><tr><th></th><th>Direct-to-Cell (spectre opérateur)</th><th>NTN 3GPP (bandes MSS)</th></tr>
+          <tr><td>Fréquences</td><td>Bandes 4G/5G de l’opérateur (700, 800, 900, 1 800, 1 900, 2 100 MHz) réutilisées depuis l’espace</td><td>Bandes du service mobile par satellite : n255 (bande L, 1,6 / 1,5 GHz), n256 (bande S, 2,0 / 2,2 GHz)</td></tr>
+          <tr><td>Terminal</td><td>Smartphone 4G/5G du commerce, <b>sans modification</b></td><td>Puce compatible <b>NTN Rel-17</b> (NB-NTN, NR-NTN) : précompensation GNSS</td></tr>
+          <tr><td>Qui corrige le Doppler ?</td><td>Le satellite, au centre de chaque faisceau</td><td>Le terminal, grâce à sa position GNSS et aux éphémérides du satellite</td></tr>
+          <tr><td>Contrainte</td><td>Ne pas brouiller les réseaux terrestres voisins (mêmes fréquences)</td><td>Parc de terminaux compatibles à renouveler</td></tr></table>
+          <p>Profils de systèmes du simulateur (ordres de grandeur publics arrondis) :</p>
+          <table><tr><th>Profil</th><th>Orbite</th><th>Antenne du satellite</th><th>Charge utile</th><th>Service</th></tr>
+          <tr><td>Direct-to-Cell LTE (type Starlink Direct to Cell)</td><td>LEO 525 km, ≈ 650 satellites</td><td>Réseau actif ≈ 6 m²</td><td>Régénérative (eNodeB à bord)</td><td>SMS, messagerie, voix</td></tr>
+          <tr><td>Grandes antennes (type AST SpaceMobile)</td><td>LEO 520 km, quelques satellites</td><td>Réseau déployé ≈ 64 m² (jusqu’à 220 m²)</td><td>Transparente</td><td>Haut débit, couverture intermittente</td></tr>
+          <tr><td>IoT GEO bande L (type Skylo)</td><td>GEO</td><td>Réflecteur ≈ 9 m</td><td>Transparente</td><td>Messages IoT, SMS</td></tr>
+          <tr><td>IoT LEO à stockage et retransmission (type Sateliot)</td><td>LEO 550 km, quelques nanosatellites</td><td>≈ 0,25 m²</td><td>Régénérative</td><td>Messages IoT différés</td></tr></table>`,
+      },
+      {
+        id: 'd2d-architecture',
+        title: 'Architecture : du terminal au cœur de réseau',
+        html: `${FIG_D2D_ARCHI}
+          <ul><li><b>Lien direct</b> (service link) : entre le terminal et le satellite, dans la bande mobile.</li>
+          <li><b>Liaison de connexion</b> (feeder link) : entre le satellite et une <b>station sol NTN</b> (gateway), en bande Ka ou C, avec de grandes paraboles.</li>
+          <li><b>Cœur mobile</b> (EPC 4G ou 5GC) de l’opérateur : authentification de la carte SIM, mobilité, accès à Internet. Le satellite n’est qu’un réseau d’accès radio.</li></ul>
+          <table><tr><th>Charge utile</th><th>Principe</th><th>Conséquence</th></tr>
+          <tr><td><b>Transparente</b> (« bent-pipe »)</td><td>Le satellite amplifie et change la fréquence ; la station de base est au sol, derrière la gateway.</td><td>Le signal fait deux trajets spatiaux ; la pluie ou le bruit du feeder dégradent <b>tous</b> les terminaux.</td></tr>
+          <tr><td><b>Régénérative</b></td><td>La station de base (eNodeB / gNB) est à bord ; liaisons laser entre satellites possibles.</td><td>Délai radio plus court, satellite plus complexe ; le feeder ne transporte que le trafic.</td></tr></table>
+          <div class="lvl-box licence"><b>Licence</b> — Pour que l’abonné soit accepté, le satellite diffuse un identifiant de réseau (PLMN) que la carte SIM sait utiliser : celui de l’opérateur (Direct-to-Cell) ou un réseau partenaire en itinérance. Sans accord entre les deux opérateurs, seule la cellule est vue : appels d’urgence seulement.</div>
+          <div class="lvl-box master"><b>Master / ingénieur</b> — En 5G NTN régénérative, on peut embarquer seulement l’unité distribuée (gNB-DU) et garder l’unité centrale (gNB-CU) au sol : l’interface F1 passe alors par le feeder. La gateway héberge aussi la fonction de compensation du délai de feeder et diffuse le « TA commun » (SIB19 en NR, SIB31 en NB-IoT).</div>`,
+      },
+      {
+        id: 'd2d-bilan',
+        title: 'Le bilan de liaison d’un smartphone',
+        html: `<p>Un smartphone n’a ni gain d’antenne (≈ 0 dBi) ni amplificateur puissant (classe 3 : <b>23 dBm</b>, soit 200 mW). Son antenne omnidirectionnelle « voit » la Terre chaude (290 K) : son facteur de mérite est minuscule.</p>
+          <div class="formula">G/T (smartphone) = 0 − 10·log(290 + 290·(10^(7/10) − 1)) ≈ −31,6 dB/K        (VSAT 1,2 m en Ku : ≈ +20 dB/K)</div>
+          <p>Tout l’effort repose donc sur le satellite : une antenne de plusieurs m² qui concentre l’énergie dans des faisceaux étroits. Exemple calculé par le simulateur (Direct-to-Cell, 1 962 MHz, satellite à 525 km vu à 50°) :</p>
+          <table><tr><th>Terme (descendant)</th><th>Valeur</th></tr>
+          <tr><td>Distance terminal → satellite : d = √((R+h)² − (R·cos E)²) − R·sin E</td><td>668 km</td></tr>
+          <tr><td>FSL = 32,45 + 20·log(668) + 20·log(1 962)</td><td>154,8 dB</td></tr>
+          <tr><td>Gain du réseau de 6 m² : G = 10·log(0,6 × 4π × 6 / 0,153²)</td><td>32,9 dBi</td></tr>
+          <tr><td>PIRE du faisceau (10 W, perte de balayage 1,1 dB)</td><td>41,7 dBW</td></tr>
+          <tr><td>Pertes : position dans le faisceau 0,75 ; scintillation 1,3 ; ombrage 1,8 ; polarisation 3 + corps 3</td><td>≈ 10,9 dB</td></tr>
+          <tr><td>Puissance reçue C</td><td><b>−93,0 dBm</b></td></tr>
+          <tr><td>Bruit sur 25 blocs (4,5 MHz) : N = −228,6 + 10·log(1 453 K) + 10·log(4,5·10⁶)</td><td>−100,4 dBm</td></tr>
+          <tr><td>SNR = C − N ; RSRP = C − 10·log(12 × 25)</td><td><b>7,4 dB</b> ; −117,8 dBm</td></tr>
+          <tr><td>Débit du faisceau (CQI 7, 16QAM)</td><td>≈ 5 Mbit/s</td></tr></table>
+          <p><b>Pourquoi l’orbite basse ?</b> Vers un GEO, le FSL vaudrait ≈ 189 dB à la même fréquence : 35 dB de plus, soit un signal 3 000 fois plus faible. Seuls des satellites GEO à réflecteur géant servent des messages IoT à très bas débit.</p>
+          <div class="lvl-box licence"><b>Licence</b> — Le <b>RSRP</b> (puissance par élément de ressource de 15 kHz) est la grandeur que le téléphone mesure et compare aux seuils. Un réseau terrestre est confortable au-dessus de −100 dBm ; une cellule satellite fonctionne vers −110 à −125 dBm. La polarisation coûte 3 dB : antenne linéaire du téléphone face à une onde circulaire.</div>
+          <div class="lvl-box master"><b>Master / ingénieur</b> — En montant, la puissance du téléphone est fixe : plus la bande allouée B est large, plus sa densité spectrale baisse (−3 dB par doublement). Le débit plafonne à la limite de Shannon à bande infinie :
+            <div class="formula">C/N0 = C − k − 10·log T_sat   ;   D_max = (C/N0)·log₂(e)</div>
+            Dans l’exemple, C = −110,1 dBm au satellite, C/N0 = 62,4 dBHz, D_max ≈ 2,5 Mbit/s ; l’allocation optimale (25 blocs, SNR −4 dB) donne ≈ 790 kbit/s. L’ordonnanceur donne donc peu de blocs à chaque terminal et partage le temps. Le modèle d’ombrage et d’encombrement suit le rapport 3GPP TR 38.811 (rural : σ ≈ 1 à 2 dB en visibilité directe, perte d’encombrement ≈ 18 dB sinon).</div>
+          <p>Méthode complète : <a href="#" data-doc="fiche-d2d">Dimensionner une liaison Direct-to-Device</a> (Fiches d’ingénierie).</p>`,
+      },
+      {
+        id: 'd2d-leo',
+        title: 'Contraintes de l’orbite basse : Doppler, délais, handover',
+        html: `<p>Un satellite à 525 km tourne à <b>7,6 km/s</b> (27 000 km/h) : il traverse le ciel en 4 à 5 minutes, puis le terminal passe au suivant (<b>handover</b>). Une couverture continue demande des centaines de satellites.</p>
+          ${FIG_DOPPLER_S}
+          <div class="formula">Doppler : f_d = (f/c)·v·R·cos E / (R + h)      → ±44 kHz à 1,9 GHz        Dérive : ḟ = (f/c)·v²·R / ((R + h)·h) ≈ 640 Hz/s</div>
+          <p>Or les sous-porteuses 4G sont espacées de 15 kHz : sans correction, le signal serait illisible. Deux solutions : le satellite <b>précompense</b> le Doppler au centre de chaque faisceau (smartphone non modifié, faisceaux étroits), ou le terminal NTN calcule lui-même le Doppler à partir de sa <b>position GNSS</b> et des <b>éphémérides</b> diffusées par le satellite.</p>
+          <div class="lvl-box licence"><b>Licence</b> — Délais : d/c = 2,2 ms pour 668 km ; RTT radio ≈ 4,5 ms en régénératif, ≈ 10 ms en transparent (deux trajets) et ≈ 500 ms en GEO. Taille de constellation pour une couverture continue :
+            <div class="formula">θ = arccos(R·cos E_min / (R + h)) − E_min   ;   N ≈ 4πR² / (0,827 × 2πR²(1 − cos θ))</div>
+            À 525 km et E_min = 25° : θ = 8,1°, rayon couvert ≈ 906 km, N ≈ 241 satellites au minimum.</div>
+          <div class="lvl-box master"><b>Master / ingénieur</b> — Le terminal doit émettre en avance pour que sa trame arrive alignée (avance temporelle) : TA commun diffusé + TA propre calculé (GNSS). L’écart centre-bord d’un faisceau, ΔTA = 2·r·cos E / c, vaut ≈ 64 µs pour 30 km ; un smartphone non modifié s’appuie sur le préambule PRACH (≈ 100 µs). Le décalage d’ordonnancement <b>K_offset</b> ≥ RTT et le nombre de processus <b>HARQ</b> nécessaires (⌈RTT + 8 ms⌉ = 13 ici) dépassent les 8 processus LTE : la Rel-17 en autorise 32, ou désactive le HARQ en GEO. Erreur résiduelle tolérée sur la fréquence montante : ±0,1 ppm ; des éphémérides trop anciennes la font dépasser.</div>`,
+      },
+      {
+        id: 'd2d-iot',
+        title: 'IoT par satellite (NB-IoT, LTE-M NTN)',
+        html: `<p>Un capteur envoie quelques dizaines d’octets plusieurs fois par jour et doit tenir <b>10 ans sur une pile</b>. Les technologies NB-IoT et LTE-M, adaptées au satellite (Rel-17), le permettent :</p>
+          <ul><li><b>Répétitions</b> : le même message est émis jusqu’à 2 048 fois ; chaque doublement apporte ≈ 2,6 dB (85 % des 3 dB théoriques). On descend ainsi à des SNR de −15 dB et plus (MCL ≈ 164 dB).</li>
+          <li><b>Une seule sous-porteuse</b> de 3,75 ou 15 kHz en montant : toute la puissance dans une bande minuscule.</li>
+          <li><b>Veille profonde</b> (PSM, eDRX) : le module dort à 3 µA entre deux messages ; la <b>RAI</b> (Release Assistance Indication) le renvoie en veille dès l’envoi.</li>
+          <li><b>Stockage et retransmission</b> : avec quelques nanosatellites, le message attend le passage d’un satellite puis la station sol suivante (quelques minutes à quelques heures).</li></ul>
+          <div class="formula">Autonomie = 0,8 × C_pile / I_moyen   ;   I_moyen = (I_GNSS·t_GNSS + I_rx·t_rx + I_tx·t_tx) × messages/jour / 86 400 s + I_veille</div>
+          <div class="lvl-box licence"><b>Licence</b> — Spécificité NTN : avant chaque émission, le module refait un <b>point GNSS</b> (quelques secondes à 25 mA) pour précompenser Doppler et délai. C’est souvent le premier poste de consommation : 4 messages par jour avec 5 s de GNSS, 8 répétitions et 1 kbit/s donnent ≈ 7 ans sur 5 Ah.</div>
+          <div class="lvl-box master"><b>Master / ingénieur</b> — Délai moyen en stockage et retransmission : τ ≈ Δt/2 + T_orbite / (2·N_stations), avec Δt l’attente entre passages ; pour 6 satellites polaires au-dessus du Sahel : ≈ 10 passages par jour, Δt ≈ 2 h 15, τ ≈ 1 h 20. Le choix GEO (toujours visible, alerte de crue en temps réel) ou LEO clairsemé (moins cher, différé) dépend du besoin de latence.</div>`,
+      },
+      {
+        id: 'd2d-coexistence',
+        title: 'Coexistence avec le réseau terrestre et réglementation',
+        html: `<p>Le Direct-to-Cell émet dans les fréquences des BTS. Il ne doit pas les brouiller :</p>
+          <ul><li>le satellite n’éclaire que les zones sans couverture terrestre de l’opérateur (géorepérage des faisceaux) ;</li>
+          <li>hors de la zone servie, la <b>densité de flux surfacique</b> au sol est plafonnée (ordre de grandeur : −120 dBW/m²/MHz) ;</li>
+          <li>le terminal reste sur la cellule terrestre tant que son RSRP dépasse le seuil de bascule (≈ −115 dBm).</li></ul>
+          <div class="formula">PFD = PIRE − L_lobes − 10·log(4π·d²) − 10·log(B_MHz)        Exemple : 40 dBW, 700 km, 5 MHz → 25 dB de lobes : −119,9 (dépassé) ; 27 dB : respecté</div>
+          <div class="lvl-box licence"><b>Licence</b> — Réglementation : l’UIT étudie pour la CMR-27 (point 1.13) l’utilisation directe des bandes mobiles IMT par des satellites ; chaque pays (au Burkina Faso, l’ARCEP) autorise l’usage du spectre de l’opérateur depuis l’espace et l’atterrissage du service. Les bandes MSS L et S relèvent déjà du service mobile par satellite.</div>
+          <div class="lvl-box master"><b>Master / ingénieur</b> — Le brouillage reçu par un terminal terrestre vaut I = PFD + 10·log(B) + 10·log(λ²/4π) + G ; on le compare au signal de la BTS (C/I). Les marges imposent des réseaux d’antennes à lobes secondaires très bas, une réutilisation de fréquences entre faisceaux (1, 3, 4 ou 7) et une coordination avec les opérateurs des pays voisins.</div>`,
+      },
+      {
+        id: 'd2d-services',
+        title: 'Services progressifs et cas d’usage',
+        html: `${FIG_D2D_SERVICES}
+          <table><tr><th>Phase</th><th>Services</th><th>Ce qu’il faut</th></tr>
+          <tr><td>1 (2024-2025)</td><td>Alerte à la population, SMS</td><td>Très peu de signal (répétitions), file d’attente acceptée</td></tr>
+          <tr><td>2 (2025-2026)</td><td>Messagerie instantanée, IoT</td><td>Quelques kbit/s par utilisateur</td></tr>
+          <tr><td>3 (2026 et après)</td><td>Voix (VoLTE), données</td><td>≈ 40 kbit/s garantis, RTT &lt; 600 ms, couverture continue</td></tr>
+          <tr><td>4 (à venir)</td><td>Vidéo, haut débit</td><td>Satellites à très grandes antennes, beaucoup de satellites</td></tr></table>
+          <p>Un service « temps réel » (voix, vidéo) exige une couverture <b>continue</b> : avec trop peu de satellites, il devient seulement <b>différé</b>. Plus il y a d’abonnés dans un faisceau, plus le débit par utilisateur baisse : les services du haut de l’escalier disparaissent les premiers.</p>
+          <p>Cas d’usage à charger dans le simulateur (Exemples 6 à 10) : zone blanche rurale, catastrophe naturelle, déplacement hors couverture, IoT au Sahel, véhicules connectés. Mode d’emploi : <a href="#" data-doc="guide-d2d">Direct-to-Device : satellite vers mobile et IoT</a> (guide de l’utilisateur).</p>`,
+      },
+    ],
+  };
 
   const COURSE = {
     chapters: [
@@ -2246,6 +2980,7 @@
           },
         ],
       },
+      COURSE_D2D,
       {
         id: 'ip',
         title: 'Transport IP moderne : VLAN, MPLS, anneaux',
@@ -2351,7 +3086,12 @@
               <tr><td>Pluie</td><td><code>γ = k·R^α</code></td></tr>
               <tr><td>Satellite</td><td><code>C/N0 = PIRE − FSL + G/T + 228,6</code></td></tr>
               <tr><td>Eb/N0</td><td><code>Eb/N0 = C/N0 − 10·log(débit binaire)</code></td></tr>
-              <tr><td>Latence</td><td><code>t = d / c</code>, c = 300 000 km/s</td></tr></table>`,
+              <tr><td>Latence</td><td><code>t = d / c</code>, c = 300 000 km/s</td></tr>
+              <tr><td>G/T d’un terminal</td><td><code>G/T = G − 10·log(290 + 290·(10^(NF/10) − 1))</code> (smartphone ≈ −31,6 dB/K)</td></tr>
+              <tr><td>RSRP</td><td><code>RSRP = C − 10·log(12 × N_RB)</code></td></tr>
+              <tr><td>Doppler LEO</td><td><code>f_d = (f/c)·v·R·cos E / (R + h)</code></td></tr>
+              <tr><td>Constellation continue</td><td><code>N ≈ 2 / (0,827·(1 − cos θ))</code>, θ = arccos(R·cos E / (R+h)) − E</td></tr>
+              <tr><td>Autonomie IoT</td><td><code>0,8 × C_pile / I_moyen</code></td></tr></table>`,
           },
           {
             id: 'glossaire',
@@ -2359,6 +3099,15 @@
             html: `<table>
               <tr><td><b>ACM</b></td><td>Adaptive Coding and Modulation : changement automatique de modulation selon la qualité du signal.</td></tr>
               <tr><td><b>BUC / LNB</b></td><td>Convertisseur-amplificateur d’émission / récepteur faible bruit d’une station satellite.</td></tr>
+              <tr><td><b>D2D / D2C</b></td><td>Direct-to-Device / Direct-to-Cell : liaison directe entre un satellite et un terminal mobile ordinaire.</td></tr>
+              <tr><td><b>eDRX / PSM</b></td><td>Modes de veille longue d’un objet connecté (économie de la pile).</td></tr>
+              <tr><td><b>Feeder</b></td><td>Liaison de connexion entre un satellite et sa station sol.</td></tr>
+              <tr><td><b>HARQ</b></td><td>Retransmission rapide avec combinaison au niveau radio.</td></tr>
+              <tr><td><b>MSS</b></td><td>Mobile Satellite Service : bandes du service mobile par satellite (L, S).</td></tr>
+              <tr><td><b>NB-IoT / LTE-M</b></td><td>Technologies 4G pour objets connectés à bas débit et basse consommation.</td></tr>
+              <tr><td><b>NTN</b></td><td>Non-Terrestrial Networks : réseaux 3GPP par satellite (Rel-17 et suivantes).</td></tr>
+              <tr><td><b>RSRP</b></td><td>Reference Signal Received Power : niveau reçu d’une cellule 4G/5G (dBm par élément de ressource).</td></tr>
+              <tr><td><b>Stockage et retransmission</b></td><td>Store &amp; forward : message gardé à bord jusqu’à la prochaine station sol.</td></tr>
               <tr><td><b>CPE</b></td><td>Customer Premises Equipment : terminal radio chez l’abonné.</td></tr>
               <tr><td><b>ERPS</b></td><td>Ethernet Ring Protection Switching (ITU-T G.8032).</td></tr>
               <tr><td><b>FSL</b></td><td>Free Space Loss : affaiblissement en espace libre.</td></tr>

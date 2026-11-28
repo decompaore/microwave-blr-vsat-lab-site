@@ -210,7 +210,7 @@
       <ol class="exam-howto"><li>Chargez le fichier <b>sujet</b> fourni par votre professeur (clé USB, dossier partagé…) : ci-dessous, ou bouton <b>Ouvrir</b> de la barre supérieure.</li><li>Indiquez votre nom, votre prénom et votre classe, puis cliquez sur <b>Commencer</b> : le chronomètre démarre.</li><li>Pendant l’examen, les corrections, les indices et les vérifications automatiques sont masqués. Les <b>consignes</b> restent accessibles dans la barre supérieure.</li><li>À la fin, cliquez sur <b>Rendre ma copie</b> (barre supérieure, ou <kbd>Ctrl</kbd>+<kbd>S</kbd>) : un fichier <code>copie-NOM-PRENOM.json</code> est enregistré. Remettez-le à votre professeur.</li></ol>
       <div class="exam-box">
         <div class="field"><label>Fichier sujet</label><input type="file" id="ex-sujet-file" accept=".json,application/json"></div>
-        ${s ? `<div class="verdict ok">Sujet chargé : <b>${esc(s.title)}</b> — durée ${s.durationMin} min · ${s.exercises.length} exercice(s) · ${s.tps.length} TP${s.pratique ? ' · dépannage pratique' : ''} · documentation ${s.docAllowed ? 'autorisée' : '<b>non autorisée</b>'}</div>` : ''}
+        ${s ? `<div class="verdict ok">Sujet chargé : <b>${esc(s.title)}</b> — durée ${esc(s.durationMin)} min · ${s.exercises.length} exercice(s) · ${s.tps.length} TP${s.pratique ? ' · dépannage pratique' : ''} · documentation ${s.docAllowed ? 'autorisée' : '<b>non autorisée</b>'}</div>` : ''}
         ${s && s.nominatif ? `<div class="verdict warn" id="ex-nominatif">Sujet nominatif : <b>${esc(s.nominatif.nom)} ${esc(s.nominatif.prenom)}</b>${s.nominatif.classe ? ' (' + esc(s.nominatif.classe) + ')' : ''}. Si ce n’est pas votre nom, signalez-le au professeur.</div>` : ''}
         ${s && s.consignes ? consignesHtml(s) : ''}
         <div class="field"><label>Nom</label><input type="text" id="ex-nom" autocomplete="off" value="${s && s.nominatif ? esc(s.nominatif.nom) : ''}" ${s && s.nominatif ? 'readonly' : ''}></div>
@@ -320,7 +320,7 @@
     const s = exam.sujet;
     ctx.api.dialog(
       'Consignes — ' + s.title,
-      `<p><b>${esc(exam.student.prenom)} ${esc(exam.student.nom)}</b> (${esc(exam.student.classe)}) · durée ${s.durationMin} min · temps restant <b class="exam-clock">${clock(remaining())}</b></p>
+      `<p><b>${esc(exam.student.prenom)} ${esc(exam.student.nom)}</b> (${esc(exam.student.classe)}) · durée ${esc(s.durationMin)} min · temps restant <b class="exam-clock">${clock(remaining())}</b></p>
       <p>${s.exercises.length} exercice(s) · ${s.tps.length} TP${s.pratique ? ' · dépannage pratique (réseau verrouillé : seuls les réglages, les mesures et les interventions sont permis)' : ''} · documentation ${s.docAllowed ? 'autorisée' : '<b>non autorisée</b>'}.</p>
       ${s.consignes ? consignesHtml(s) : '<p class="small-muted">Pas de consigne particulière.</p>'}
       <p class="small-muted">Pour terminer : <b>Rendre ma copie</b> dans la barre supérieure, ou <kbd>Ctrl</kbd>+<kbd>S</kbd>. À la fin du temps, la copie est rendue automatiquement.</p>`

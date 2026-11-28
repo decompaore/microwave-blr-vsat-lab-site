@@ -29,7 +29,8 @@
   const MBV = (root.MBV = root.MBV || {});
 
   const RADIO_FH = ['antenna', 'fullOutdoor'];
-  const ENDPOINTS = ['gnodeb', 'ruralSite', 'bankAgency', 'pc', 'server', 'internet'];
+  const ENDPOINTS = ['gnodeb', 'ruralSite', 'bankAgency', 'pc', 'server', 'internet', 'ue', 'iotDevice', 'vehicle'];
+  const D2D_TERMS = ['ue', 'iotDevice', 'vehicle'];
   const between = (rnd, a, b) => a + (b - a) * rnd();
   const pick = (rnd, list) => list[Math.floor(rnd() * list.length)];
   const vlanList = (v) =>
@@ -37,6 +38,13 @@
       .split(/[,\s;]+/)
       .map((x) => parseInt(x, 10))
       .filter((x) => x > 0);
+  /** VLAN autorisés, lus comme le moteur réseau (null = tous) ; secours si ip_network.js est absent. */
+  const allowedVlans = (v) => {
+    const ip = MBV.IpNetwork && MBV.IpNetwork.IpTools;
+    if (ip) return ip.parseVlanList(v);
+    const s = String(v === undefined || v === null ? '' : v).trim().toLowerCase();
+    return s === '' || s === 'all' || s === 'tous' || s === '*' ? null : new Set(vlanList(v));
+  };
 
   /* ------------------------------------------------------------------
    * Interventions possibles de l'élève (mode Dépannage)
@@ -65,6 +73,12 @@
     'link:coax': ['cable'],
     'link:ethernet': ['cable'],
     'link:fiber': ['cable'],
+    gnodeb: ['replace', 'branch'],
+    ntnGateway: ['replace', 'repoint'],
+    mobileCore: ['replace'],
+    ue: ['replace'],
+    iotDevice: ['replace'],
+    vehicle: ['replace', 'branch'],
   };
 
   /* ------------------------------------------------------------------
@@ -137,6 +151,37 @@
       effect: (f) => ({ azErrDeg: f.meta.azErrDeg }),
     },
     'cpe-hs': { kind: 'hw', label: 'CPE hors service', targets: ['blrCpe'], fix: 'replace', effect: { dead: true }, can: (o, ctx) => !!ctx.blrLinkOf(o) },
+    /* ---------- Matériel Direct-to-Device (NTN) ---------- */
+    'cellule-muette': { kind: 'hw', label: 'Module radio de la BTS hors service (la cellule n’émet plus)', targets: ['gnodeb'], fix: 'replace', effect: { cellOff: true }, can: (o, ctx) => ctx.cellLinksOf(o).length > 0 },
+    'jarretiere-bts': {
+      kind: 'hw',
+      label: 'Jarretière d’antenne de la BTS humide / desserrée (pertes +15 à +22 dB)',
+      targets: ['gnodeb'],
+      fix: 'branch',
+      can: (o, ctx) => ctx.cellLinksOf(o).length > 0,
+      make: (o, ctx, rnd) => ({ meta: { lossDb: Math.round(between(rnd, 15, 22)) } }),
+      effect: (f) => ({ extraLossDb: f.meta.lossDb }),
+    },
+    'station-sol-hs': { kind: 'hw', label: 'Station sol NTN hors service (amplificateur, modem)', targets: ['ntnGateway'], fix: 'replace', effect: { dead: true }, can: (o, ctx) => ctx.feedersOf(o).length > 0 },
+    'station-sol-depointee': {
+      kind: 'hw',
+      label: 'Antenne de la station sol NTN mal poursuivie (perte de poursuite, −14 à −20 dB)',
+      targets: ['ntnGateway'],
+      fix: 'repoint',
+      can: (o, ctx) => ctx.feedersOf(o).length > 0,
+      make: (o, ctx, rnd) => ({ meta: { lossDb: Math.round(between(rnd, 14, 20)) } }),
+      effect: (f) => ({ extraLossDb: f.meta.lossDb }),
+    },
+    'terminal-hs': { kind: 'hw', label: 'Terminal mobile hors service (carte radio)', targets: D2D_TERMS, fix: 'replace', effect: { dead: true }, can: (o, ctx) => ctx.accessLinksOf(o).length > 0 },
+    'antenne-toit': {
+      kind: 'hw',
+      label: 'Câble de l’antenne de toit du véhicule écrasé (pertes +15 à +20 dB)',
+      targets: ['vehicle'],
+      fix: 'branch',
+      can: (o, ctx) => o.props.antenna !== 'interieur' && ctx.accessLinksOf(o).length > 0,
+      make: (o, ctx, rnd) => ({ meta: { lossDb: Math.round(between(rnd, 15, 20)) } }),
+      effect: (f) => ({ extraLossDb: f.meta.lossDb }),
+    },
     'cable-reseau-coupe': { kind: 'hw', label: 'Câble réseau (cuivre ou fibre) coupé / connecteur défectueux', targets: ['link:ethernet', 'link:fiber'], fix: 'cable', effect: { cut: true }, can: () => true },
 
     /* ---------- Configuration ---------- */
@@ -202,8 +247,9 @@
       },
       fixed: (o) => {
         const f = o.props.fault;
-        const v = String(o.props.vlans || '').trim().toLowerCase();
-        return v === 'all' || v === '' || vlanList(o.props.vlans).includes(f.meta.vlan);
+        // Même lecture que le moteur réseau : « all », vide, plages « 100-300 »…
+        const set = allowedVlans(o.props.vlans);
+        return set === null || set.has(f.meta.vlan);
       },
     },
     'vlan-acces-cpe': {
@@ -214,6 +260,46 @@
       make: (o) => ({ patch: { accessVlan: Number(o.props.accessVlan) + 10 } }),
       fixed: (o) => Number(o.props.accessVlan) === Number(o.props.fault.restore.accessVlan),
     },
+    'abonnement-satellite': {
+      kind: 'cfg',
+      label: 'Abonnement du terminal non autorisé sur le satellite',
+      targets: D2D_TERMS,
+      can: (o, ctx) => o.props.simNtn !== false && ctx.satLinksOf(o).length > 0,
+      make: () => ({ patch: { simNtn: false } }),
+      fixed: (o) => o.props.simNtn !== false,
+    },
+    'accord-ntn': {
+      kind: 'cfg',
+      label: 'Accord d’itinérance avec l’opérateur satellite désactivé dans le cœur mobile',
+      targets: ['mobileCore'],
+      can: (o, ctx) => o.props.ntnAgreement !== false && ctx.hasD2d(),
+      make: () => ({ patch: { ntnAgreement: false } }),
+      fixed: (o) => o.props.ntnAgreement !== false,
+    },
+    'puce-ntn': {
+      kind: 'cfg',
+      label: 'Mode NTN (Rel-17) désactivé sur le terminal',
+      targets: D2D_TERMS,
+      can: (o, ctx) => ctx.ntnChip(o) && ctx.needsNtn(o),
+      make: () => ({ patch: { ntnChip: false } }),
+      fixed: (o, ctx) => o.props.ntnChip === true || !ctx.needsNtn(o),
+    },
+    'ephemerides-perimees': {
+      kind: 'cfg',
+      label: 'Éphémérides du satellite périmées dans l’objet connecté (mise à jour désactivée)',
+      targets: ['iotDevice'],
+      can: (o, ctx) => Number(o.props.ephemerisAgeS === undefined ? 60 : o.props.ephemerisAgeS) <= 3600 && ctx.needsNtn(o) && ctx.onLeo(o),
+      make: () => ({ patch: { ephemerisAgeS: 43200 } }),
+      fixed: (o) => Number(o.props.ephemerisAgeS) <= 3600,
+    },
+    'seuil-bascule': {
+      kind: 'cfg',
+      label: 'Seuil de bascule vers le satellite trop élevé dans le cœur mobile',
+      targets: ['mobileCore'],
+      can: (o, ctx) => Number(o.props.thresholdDbm === undefined ? -115 : o.props.thresholdDbm) <= -110 && ctx.hasCellAndSat(),
+      make: () => ({ patch: { thresholdDbm: -95 } }),
+      fixed: (o) => Number(o.props.thresholdDbm) <= -110,
+    },
     'ip-erronee': {
       kind: 'cfg',
       label: 'Adresse IP du terminal dans le mauvais réseau',
@@ -221,7 +307,10 @@
       can: (o) => /^\d+\.\d+\.\d+\.\d+$/.test(String(o.props.ip || '')) && Number(o.props.prefix || 24) >= 16 && Number(o.props.prefix || 24) <= 24,
       make: (o) => {
         const b = String(o.props.ip).split('.').map(Number);
-        b[2] = (b[2] + 100) % 250;
+        // Octet entièrement dans la partie réseau : 3e en /24, 2e de /16 à /23
+        // (changer le 3e octet en /16 laisserait l'adresse dans le même réseau).
+        const k = Number(o.props.prefix || 24) >= 24 ? 2 : 1;
+        b[k] = (b[k] + 100) % 250;
         return { patch: { ip: b.join('.') } };
       },
       fixed: (o) => {

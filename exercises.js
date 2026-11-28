@@ -2,7 +2,7 @@
  * exercises.js — Exercices corrigés (type examen, auto-évaluation)
  * MicroWave, BLR & VSAT Lab
  *
- * 6 séries de 5 exercices de calcul. Pour chaque exercice :
+ * 7 séries de 5 exercices de calcul. Pour chaque exercice :
  *   - énoncé et données ;
  *   - champs de réponse numériques vérifiés avec une tolérance ;
  *   - indice, puis correction détaillée visible après 2 essais
@@ -540,7 +540,102 @@
     ],
   };
 
-  const SERIES = [S1, S2, S3, S4, S5, S6];
+  /* ------------------------------------------------------------------
+   * SÉRIE 7 — Direct-to-Device (satellite vers mobile et IoT)
+   * Formules identiques au moteur d2d_physics.js.
+   * ------------------------------------------------------------------ */
+  const S7 = (() => {
+    const R = 6378.137;
+    const deg = Math.PI / 180;
+    // Exercice 1 : distance et FSL (h = 525 km, E = 50°, 1 962 MHz)
+    const h1 = 525;
+    const E1 = 50 * deg;
+    const d1 = Math.sqrt((R + h1) ** 2 - (R * Math.cos(E1)) ** 2) - R * Math.sin(E1);
+    const fsl1 = 32.45 + 20 * log10(d1) + 20 * log10(1962);
+    // Exercice 2 : G/T d'un smartphone et bruit sur 4,5 MHz
+    const t2 = 290 + 290 * (Math.pow(10, 0.7) - 1);
+    const gt2 = 0 - 10 * log10(t2);
+    const n2 = -228.6 + 10 * log10(t2) + 10 * log10(4.5e6) + 30;
+    // Exercice 3 : RSRP et SNR (C = −93,0 dBm, 25 blocs)
+    const rsrp3 = -93.0 - 10 * log10(12 * 25);
+    const snr3 = -93.0 - n2;
+    // Exercice 4 : Doppler maximal et dérive (1 882 MHz, 525 km)
+    const v4 = Math.sqrt(398600.4418 / (R + h1));
+    const fd4 = ((1882e6 / 299792.458) * v4 * (R / (R + h1))) / 1000;
+    const rate4 = (1882e6 / 299792.458) * ((v4 * v4 * R) / ((R + h1) * h1));
+    // Exercice 5 : autonomie d'un capteur IoT
+    const q5 = 25 * 5 + 50 * 1.5 + 230 * 0.5;
+    const i5 = (q5 * 10) / 86400 + 0.003;
+    const y5 = (0.8 * 3600) / i5 / 8760;
+    return {
+      id: 's7',
+      num: 'S7',
+      title: 'Direct-to-Device : satellite vers mobile et IoT',
+      subtitle: 'Distance et FSL, G/T d’un smartphone, RSRP, Doppler, autonomie IoT (Bac Pro → Master)',
+      exercises: [
+        {
+          id: 's7e1',
+          title: 'Distance et affaiblissement vers un satellite LEO',
+          statement: '<p>Un satellite Direct-to-Cell tourne à <b>h = 525 km</b>. Il est vu depuis un smartphone sous une élévation de <b>50°</b>. Calculez la distance smartphone → satellite (R = 6 378 km), puis l’affaiblissement en espace libre à <b>1 962 MHz</b>.</p><div class="formula">d = √((R + h)² − (R·cos E)²) − R·sin E      FSL = 32,45 + 20·log(d_km) + 20·log(f_MHz)</div>',
+          fields: [
+            { label: 'Distance d', unit: 'km', answer: d1, tol: 1.5 },
+            { label: 'FSL', unit: 'dB', answer: fsl1, tol: 0.1 },
+          ],
+          hint: 'R + h = 6 903 km ; R·cos 50° ≈ 4 100 km ; R·sin 50° ≈ 4 886 km.',
+          correction: `<p>d = √(6 903² − 4 099,8²) − 4 885,9 = <b>${fmt(d1, 0)} km</b>.</p><p>FSL = 32,45 + 20·log(${fmt(d1, 0)}) + 20·log(1 962) = 32,45 + ${fmt(20 * log10(d1), 2)} + ${fmt(20 * log10(1962), 2)} = <b>${fmt(fsl1, 1)} dB</b>. Vers un GEO (≈ 36 700 km), on aurait ≈ 189,5 dB : 35 dB de plus.</p>`,
+        },
+        {
+          id: 's7e2',
+          title: 'Facteur de mérite d’un smartphone (Licence)',
+          statement: '<p>Un smartphone a une antenne de <b>0 dBi</b> qui voit la Terre à <b>290 K</b> et un récepteur de facteur de bruit <b>NF = 7 dB</b>. Calculez la température de bruit du système, le G/T, puis la puissance de bruit sur <b>4,5 MHz</b> (25 blocs de ressources) en dBm.</p><div class="formula">T = T_ant + 290·(10^(NF/10) − 1)      G/T = G − 10·log T      N = k + 10·log T + 10·log B   (k = −228,6 dBW/K/Hz)</div>',
+          fields: [
+            { label: 'T système', unit: 'K', answer: t2, tol: 3 },
+            { label: 'G/T', unit: 'dB/K', answer: gt2, tol: 0.05 },
+            { label: 'Bruit N', unit: 'dBm', answer: n2, tol: 0.1 },
+          ],
+          hint: '10^0,7 ≈ 5,012 ; 10·log(4,5·10⁶) ≈ 66,5 ; dBm = dBW + 30.',
+          correction: `<p>T = 290 + 290 × (5,012 − 1) = <b>${fmt(t2, 0)} K</b> ; G/T = 0 − 10·log(${fmt(t2, 0)}) = <b>${fmt(gt2, 1)} dB/K</b> (un VSAT de 1,2 m en Ku : ≈ +20 dB/K).</p><p>N = −228,6 + ${fmt(10 * log10(t2), 2)} + ${fmt(10 * log10(4.5e6), 2)} = ${fmt(n2 - 30, 2)} dBW = <b>${fmt(n2, 1)} dBm</b>.</p>`,
+        },
+        {
+          id: 's7e3',
+          title: 'RSRP et SNR d’une cellule satellite',
+          statement: `<p>Le smartphone reçoit une puissance totale <b>C = −93,0 dBm</b> d’une cellule satellite 4G de 5 MHz (<b>25 blocs</b> de 12 sous-porteuses). Le bruit dans la bande occupée vaut <b>${fmt(n2, 1)} dBm</b>. Calculez le RSRP (puissance par élément de ressource) et le SNR.</p><div class="formula">RSRP = C − 10·log(12 × N_RB)      SNR = C − N</div>`,
+          fields: [
+            { label: 'RSRP', unit: 'dBm', answer: rsrp3, tol: 0.1 },
+            { label: 'SNR', unit: 'dB', answer: snr3, tol: 0.1 },
+          ],
+          hint: '12 × 25 = 300 éléments de ressource ; 10·log(300) ≈ 24,8.',
+          correction: `<p>RSRP = −93,0 − 10·log(300) = −93,0 − 24,77 = <b>${fmt(rsrp3, 1)} dBm</b> : niveau typique d’un service satellite (un réseau terrestre est confortable au-dessus de −100 dBm).</p><p>SNR = −93,0 − (${fmt(n2, 1)}) = <b>${fmt(snr3, 1)} dB</b> : CQI 7 (16QAM), ≈ 5 Mbit/s partagés dans le faisceau.</p>`,
+        },
+        {
+          id: 's7e4',
+          title: 'Doppler d’un satellite défilant (Master / ingénieur)',
+          statement: '<p>Le smartphone émet à <b>1 882 MHz</b> vers un satellite à <b>525 km</b>. Calculez la vitesse orbitale, le Doppler maximal (satellite à l’horizon, E = 0°) et la dérive Doppler maximale (au zénith).</p><div class="formula">v = √(μ / (R + h)), μ = 398 600 km³/s²      f_d = (f/c)·v·R·cos E / (R + h)      ḟ = (f/c)·v²·R / ((R + h)·h)</div>',
+          fields: [
+            { label: 'Vitesse v', unit: 'km/s', answer: v4, tol: 0.01 },
+            { label: 'Doppler maximal', unit: 'kHz', answer: fd4, tol: 0.15 },
+            { label: 'Dérive maximale', unit: 'Hz/s', answer: rate4, tol: 3 },
+          ],
+          hint: 'f/c = 1 882·10⁶ / 299 792 ≈ 6 278 Hz par km/s ; R / (R + h) ≈ 0,924.',
+          correction: `<p>v = √(398 600 / 6 903) = <b>${fmt(v4, 2)} km/s</b>.</p><p>f_d = 6 278 × ${fmt(v4, 3)} × 0,924 = <b>±${fmt(fd4, 1)} kHz</b> : près de trois sous-porteuses de 15 kHz, à précompenser.</p><p>ḟ = 6 278 × ${fmt(v4, 3)}² × 6 378 / (6 903 × 525) = <b>${fmt(rate4, 0)} Hz/s</b>.</p>`,
+        },
+        {
+          id: 's7e5',
+          title: 'Autonomie d’un capteur IoT par satellite',
+          statement: '<p>À chaque message, un capteur NB-IoT NTN fait un point GNSS de <b>5 s à 25 mA</b>, reçoit pendant <b>1,5 s à 50 mA</b> et émet pendant <b>0,5 s à 230 mA</b>. Il envoie <b>10 messages par jour</b> et consomme <b>3 µA</b> en veille. Calculez la charge par message, le courant moyen et l’autonomie d’une pile de <b>3 600 mAh</b> (on garde 20 % de marge).</p><div class="formula">Q = Σ I·t      I_moy = Q × messages / 86 400 + I_veille      Autonomie = 0,8 × C / I_moy</div>',
+          fields: [
+            { label: 'Charge par message', unit: 'mA·s', answer: q5, tol: 1 },
+            { label: 'Courant moyen', unit: 'µA', answer: i5 * 1000, tol: 0.5 },
+            { label: 'Autonomie', unit: 'ans', answer: y5, tol: 0.1 },
+          ],
+          hint: '1 an = 8 760 h ; convertissez le courant moyen en mA.',
+          correction: `<p>Q = 25 × 5 + 50 × 1,5 + 230 × 0,5 = 125 + 75 + 115 = <b>${fmt(q5, 0)} mA·s</b> : le point GNSS est le premier poste.</p><p>I_moy = ${fmt(q5, 0)} × 10 / 86 400 + 0,003 = <b>${fmt(i5 * 1000, 1)} µA</b>.</p><p>Autonomie = 0,8 × 3 600 / ${fmt(i5, 4)} / 8 760 = <b>${fmt(y5, 1)} ans</b>. Pour 10 ans : moins de messages, un point GNSS plus court ou une émission plus rapide.</p>`,
+        },
+      ],
+    };
+  })();
+
+  const SERIES = [S1, S2, S3, S4, S5, S6, S7];
 
   /* ------------------------------------------------------------------
    * PROGRESSION (mémorisée dans le navigateur de l'élève)

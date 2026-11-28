@@ -38,7 +38,7 @@
     <rect x="10" y="58" width="130" height="230" rx="6" fill="#111a2e" stroke="#a78bfa"/>
     <text x="75" y="80" fill="#e2e8f0" font-weight="bold" text-anchor="middle">② Boîte à outils</text>
     <text x="75" y="102" fill="#a9b8d3" text-anchor="middle">Sites &amp; obstacles</text>
-    <text x="75" y="120" fill="#a9b8d3" text-anchor="middle">FH · BLR · VSAT</text>
+    <text x="75" y="120" fill="#a9b8d3" text-anchor="middle">FH · BLR · VSAT · D2D</text>
     <text x="75" y="138" fill="#a9b8d3" text-anchor="middle">Réseau IP / MPLS</text>
     <rect x="148" y="58" width="322" height="26" rx="4" fill="#16213a" stroke="#334155"/>
     <text x="158" y="76" fill="#a9b8d3">Outils : V · L · F · P · C · Suppr · orage · zoom</text>
@@ -241,6 +241,40 @@
       ],
     },
     {
+      id: 'guide-d2d',
+      group: G_GUIDE,
+      title: 'Direct-to-Device : satellite vers mobile et IoT',
+      sections: [
+        {
+          id: 'd2d-poser',
+          title: 'Construire un réseau Direct-to-Device',
+          html: `<p>La famille <b>Direct-to-Device (D2D / NTN)</b> de la boîte à outils relie un satellite directement à un <b>smartphone</b>, un <b>capteur IoT</b> ou un <b>véhicule</b>, sans parabole. Chaîne à respecter :</p>
+            <ul><li><b>Terminal</b> (smartphone, capteur IoT, véhicule) — lien <i>direct</i> — <b>Satellite D2D</b> — <i>liaison de connexion (feeder)</i> — <b>Station sol NTN</b> — fibre — <b>Cœur mobile</b> (EPC / 5GC) — réseau IP, serveurs, Internet.</li>
+            <li>Pour comparer avec le réseau terrestre, reliez aussi le terminal à une <b>BTS / gNodeB</b> (lien <i>accès radio terrestre 4G</i>) : la BTS doit elle-même être raccordée au cœur (fibre, FH, VSAT…), sinon sa cellule est hors antenne.</li></ul>
+            <p>Paramètres du <b>Satellite D2D</b> : le <b>système</b> (Direct-to-Cell LTE, haut débit à grandes antennes, IoT GEO bande L, IoT LEO à stockage et retransmission), la bande (spectre de l’opérateur ou bande MSS), le canal, la puissance par faisceau, la réutilisation de fréquence, l’élévation ou le défilement réel (horloge, voir ${link('guide-satellites', 'defilants', 'Satellites défilants')}), le nombre de satellites et les autres utilisateurs du faisceau. Un satellite GEO se place seul sur l’orbite géostationnaire.</p>
+            <p>Paramètres du <b>terminal</b> : type (smartphone classe 3 ou 2), emplacement (extérieur, véhicule, intérieur), <b>puce NTN 3GPP Rel-17</b>, abonnement autorisé sur le satellite, vue dégagée du ciel, position dans le faisceau ; pour un capteur IoT : messages par jour, taille, pile, durée du point GNSS, RAI, âge des éphémérides. Le <b>Cœur mobile</b> porte l’accord avec l’opérateur satellite et le seuil de bascule ; la <b>Station sol NTN</b> peut subir la pluie locale.</p>`,
+        },
+        {
+          id: 'd2d-acces',
+          title: 'Réseau terrestre prioritaire et bascule vers le satellite',
+          html: `<p>Chaque terminal choisit lui-même son réseau, comme un vrai mobile : la <b>cellule terrestre reste prioritaire</b> tant que son RSRP dépasse le seuil du cœur mobile (−115 dBm par défaut). En dessous — zone blanche, BTS détruite, BTS privée de transmission — il se rattache à la <b>cellule satellite</b>, si le satellite est visible, si le terminal est compatible et si l’abonnement est accepté.</p>
+            <ul><li>Sur le canevas, le lien actif est coloré (vert : voix et données, orange : service réduit), le lien de secours est gris pointillé « <b>veille</b> », un lien sans service est rouge. L’étiquette du terminal indique 📶 4G terrestre ou 📡 satellite.</li>
+            <li>Le journal note chaque bascule ; les flux IP suivent le réseau choisi.</li>
+            <li>Le cône vert sous le satellite représente l’<b>empreinte du faisceau</b> : plusieurs dizaines de kilomètres pour un seul faisceau.</li>
+            <li><b>Terminal en mouvement</b> : réglez le « Mouvement » d’un smartphone ou d’un véhicule sur « Sur un trajet » (longueur, direction, vitesse). Le trajet est tracé en pointillés ; lancez l’horloge (▶) : le terminal fait l’aller-retour et bascule entre cellules terrestres et satellite au fil de la route.</li></ul>
+            <p><b>Dépannage</b> (mode Diagnostic → Dépannage) : les terminaux affichent le réseau utilisé (voyant « Réseau 4G », « Réseau SAT » ou « Aucun réseau »), la BTS le voyant « Émission cellule », la station sol le voyant « Poursuite satellite ». Le bilan compare le RSRP <b>calculé</b> et <b>mesuré</b>. Interventions possibles : remplacer la BTS, le terminal ou la station sol, refaire le branchement d’antenne (BTS, véhicule), repointer la station sol. Méthode : ${link('fiche-pannes', 'tableau-pannes', 'Du symptôme à la cause')}.</p>
+            <p>Notions de cours : ${link('d2d', 'd2d-pourquoi', 'Direct-to-Device : satellite vers mobile et IoT')}. Cinq réseaux prêts à explorer illustrent les usages (fenêtre Travaux Pratiques → onglet <b>Exemples</b>, Ex 6 à 10) : zone blanche rurale, catastrophe naturelle, déplacement hors couverture, IoT au Sahel, véhicules connectés.</p>`,
+        },
+        {
+          id: 'd2d-bilan',
+          title: 'Bilan, niveau des calculs, services et analyseurs',
+          html: `<p>Sélectionnez le lien direct d’un terminal. L’onglet <b>Bilan de liaison</b> donne l’élévation, le RSRP, le SINR, le débit du faisceau et par utilisateur, le débit montant optimal, le Doppler et la latence, puis le tableau des <b>services progressifs</b> (alerte, SMS, IoT, messagerie, voix, données, vidéo) avec la raison de chaque refus, et enfin tous les calculs pas à pas par rubrique.</p>
+            <p>Le sélecteur <b>Niveau des calculs</b> adapte le détail : <b>Bac Pro</b> (bilan essentiel : distance, FSL, puissance reçue, SNR, latence), <b>Licence</b> (G/T, RSRP, empreinte, scintillation, Doppler, couverture) ou <b>Master / ingénieur</b> (perte de balayage, ombrage 3GPP TR 38.811, SINR, plafond de Shannon, allocation montante, HARQ, K_offset). Le choix est mémorisé sur le poste ; chaque calcul avancé porte une étiquette de niveau.</p>
+            <p>L’onglet <b>Profil &amp; Fresnel</b> devient pour ce lien un ensemble d’<b>analyseurs</b> : courbe en S du Doppler et de l’élévation pendant un passage, couverture et taille de constellation, partage du faisceau et, pour un capteur IoT, l’<b>autonomie de la pile</b> et le délai de stockage et retransmission. Pour un lien terrestre, il trace le RSRP selon la distance à la BTS avec le seuil de bascule et le niveau du satellite.</p>`,
+        },
+      ],
+    },
+    {
       id: 'guide-reseau',
       group: G_GUIDE,
       title: 'Réseau IP : adresses, VLAN, flux et ping',
@@ -318,7 +352,7 @@
           html: `<p>Bouton <b>Travaux Pratiques (TP)</b> : la fenêtre a plusieurs onglets.</p>
             <table><tr><th>Onglet</th><th>Contenu</th></tr>
             <tr><td>Tutoriels</td><td>Prises en main guidées, pas à pas, pour découvrir une fonction du simulateur.</td></tr>
-            <tr><td>Travaux pratiques</td><td>16 TP de 1 à 3 h : contexte, objectifs, étapes vérifiées automatiquement, questions et synthèse.</td></tr>
+            <tr><td>Travaux pratiques</td><td>21 TP de 1 à 3 h : contexte, objectifs, étapes vérifiées automatiquement, questions et synthèse.</td></tr>
             <tr><td>Exercices corrigés</td><td>Calculs de bilan, Fresnel, pluie, satellite… avec correction et explication pas à pas.</td></tr>
             <tr><td>Exemples</td><td>Réseaux prêts à explorer, sans consignes : backhaul FH d’un site 4G, recette du backhaul (une liaison non conforme à trouver), réseau VSAT en étoile, BLR 5,8 GHz à trois secteurs, constellation LEO.</td></tr></table>
             <p>Les épreuves se passent dans la fenêtre <b>Examen</b> (bouton de la barre supérieure) : voir ${link('guide-examen', 'passer', 'Passer un examen')}.</p>`,
@@ -573,6 +607,40 @@
       ],
     },
     {
+      id: 'fiche-d2d',
+      group: G_FICHES,
+      title: 'Dimensionner une liaison Direct-to-Device',
+      sections: [
+        {
+          id: 'methode-d2d',
+          title: 'Méthode en huit étapes',
+          html: `<ol><li><b>Besoin</b> : quels services (SMS, IoT, voix, données), combien d’abonnés actifs par faisceau, quelle latence acceptable, couverture continue ou différée ?</li>
+            <li><b>Système et bande</b> : Direct-to-Cell dans le spectre de l’opérateur (smartphones du commerce) ou NTN en bande L/S (terminaux Rel-17) ; LEO (faible latence, beaucoup de satellites) ou GEO (toujours visible, ≈ 550 ms).</li>
+            <li><b>Géométrie</b> : élévation minimale, distance d = √((R+h)² − (R·cos E)²) − R·sin E, angle de visée et perte de balayage.</li>
+            <li><b>Bilan descendant</b> : PIRE du faisceau − FSL − pertes (position dans le faisceau, scintillation, ombrage, polarisation 3 dB, corps 3 dB, véhicule 8 dB, bâtiment ≈ 18 dB) + G du terminal → C, RSRP, SNR.</li>
+            <li><b>Bilan montant</b> : 23 dBm − pertes + G/T du satellite → C/N0 ; choisir le nombre de blocs (ou une tonalité NB-IoT) qui maximise le débit.</li>
+            <li><b>Débit et services</b> : CQI (ou répétitions), débit du faisceau, débit par utilisateur actif, tableau des services progressifs.</li>
+            <li><b>Contraintes LEO</b> : Doppler et précompensation, avance temporelle, K_offset, HARQ, taille de constellation, revisite.</li>
+            <li><b>Réseau</b> : feeder et station sol (pluie en bande Ka), cœur mobile, accord avec l’opérateur satellite, seuil de bascule, coexistence (densité de flux hors zone).</li></ol>
+            <p>Le simulateur affiche chaque étape pas à pas (onglet Bilan de liaison, niveau des calculs au choix). Cours : ${link('d2d', 'd2d-bilan', 'Le bilan de liaison d’un smartphone')}.</p>`,
+        },
+        {
+          id: 'reperes-d2d',
+          title: 'Repères chiffrés',
+          html: `<table><tr><th>Grandeur</th><th>Ordre de grandeur</th></tr>
+            <tr><td>Puissance d’un smartphone / gain d’antenne</td><td>23 dBm (classe 3), 26 dBm (classe 2) / ≈ 0 dBi</td></tr>
+            <tr><td>G/T d’un smartphone</td><td>≈ −31,6 dB/K</td></tr>
+            <tr><td>FSL à 2 GHz : LEO 550 km au zénith / à 25° / GEO</td><td>≈ 153 dB / ≈ 159 dB / ≈ 190 dB</td></tr>
+            <tr><td>RSRP de service satellite</td><td>−110 à −125 dBm</td></tr>
+            <tr><td>Doppler LEO à 2 GHz / dérive</td><td>±45 kHz / ≈ 600 Hz/s</td></tr>
+            <tr><td>Empreinte d’un faisceau LEO</td><td>30 à 60 km (D2C), centaines de km (IoT)</td></tr>
+            <tr><td>Débit d’un faisceau D2C de 5 MHz</td><td>quelques Mbit/s partagés</td></tr>
+            <tr><td>Satellites pour une couverture continue (525 km, 25°)</td><td>≥ 241 (bien plus pour la capacité)</td></tr>
+            <tr><td>Autonomie IoT visée</td><td>10 ans sur une pile de quelques Ah</td></tr></table>`,
+        },
+      ],
+    },
+    {
       id: 'fiche-ip',
       group: G_FICHES,
       title: 'Plan d’adressage IP et VLAN',
@@ -645,7 +713,12 @@
             <tr><td>Abonné BLR sans service</td><td>RSL du CPE, voyants, ping</td><td>CPE hors service ou dépointé, VLAN d’accès erroné</td></tr>
             <tr><td>Station VSAT : Rx non verrouillé</td><td>Voyant Rx, Eb/N0 descendant</td><td>LNB, câble coaxial, parabole dépointée</td></tr>
             <tr><td>Station VSAT : Rx OK mais pas d’émission</td><td>Voyant Tx</td><td>BUC hors service, câble coaxial d’émission</td></tr>
-            <tr><td>Radio OK mais un service ne passe pas</td><td>Ping, traceroute</td><td>VLAN non autorisé, adresse IP dans le mauvais réseau, câble réseau</td></tr></table>
+            <tr><td>Radio OK mais un service ne passe pas</td><td>Ping, traceroute</td><td>VLAN non autorisé, adresse IP dans le mauvais réseau, câble réseau</td></tr>
+            <tr><td>Terminal mobile près d’une BTS, mais sur le satellite</td><td>Voyant « Émission cellule » de la BTS ; RSRP terrestre calculé / mesuré</td><td>Module radio de la BTS, jarretière d’antenne, transmission de la BTS coupée, seuil de bascule du cœur mobile mal réglé</td></tr>
+            <tr><td>Cellule satellite vue, inscription refusée</td><td>Message du terminal, paramètres du cœur mobile</td><td>Abonnement non autorisé sur le satellite, accord avec l’opérateur satellite absent</td></tr>
+            <tr><td>Tous les terminaux d’un satellite sans service</td><td>Voyant « Poursuite satellite » de la station sol ; C/N du feeder</td><td>Station sol hors service ou mal poursuivie, orage sur la station sol, fibre station sol – cœur</td></tr>
+            <tr><td>Objet IoT reçu mais jamais entendu par le satellite</td><td>Rubrique Doppler du bilan, paramètres de l’objet</td><td>Éphémérides périmées, mode NTN désactivé</td></tr>
+            <tr><td>Terminal sans aucun réseau, voyant « Aucun réseau »</td><td>Voyants, bilans terrestre et satellite</td><td>Terminal hors service, antenne de toit du véhicule endommagée, terminal à l’intérieur</td></tr></table>
             <p>Méthode et rapport d’intervention : cours ${link('depannage', '', 'Maintenance et dépannage')}.</p>`,
         },
       ],
@@ -669,7 +742,7 @@
             <table><tr><th>Livret</th><th>Contenu</th></tr>
             <tr><td>${doc('tutoriels-imprimables.html', '📘 Tutoriels')}</td><td>13 tutoriels illustrés de captures d’écran (interface, bond FH, bilan, Fresnel, pluie et ACM, VSAT et pointage, LEO, BLR et VLAN, réseau IP et anneau, dépannage, recette, activités et examen), fiche mémo, grille d’auto-évaluation.</td></tr>
             <tr><td>${doc('tp-complementaires-imprimables.html', '📗 TP complémentaires')}</td><td>4 TP de 2 h avec fiches à compléter : étude d’un bond FH de 32 km, recette d’un réseau régional, dépannage sur sujet avec fiche d’intervention, avant-projet VSAT d’un site minier (appel d’offres).</td></tr>
-            <tr><td>${doc('exercices-imprimables.html', '📙 Exercices')}</td><td>Les 30 exercices des 6 séries, avec lignes de réponse, puis leurs corrigés détaillés.</td></tr></table>
+            <tr><td>${doc('exercices-imprimables.html', '📙 Exercices')}</td><td>Les 35 exercices des 7 séries, avec lignes de réponse, puis leurs corrigés détaillés.</td></tr></table>
             <p>Les <b>fiches élèves</b> de chaque TP du simulateur s’impriment depuis la fenêtre des TP (bouton « 📄 Fiche élève »).</p>
             `,
         },

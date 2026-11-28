@@ -360,11 +360,11 @@
      * Le terminal se raccorde au satellite visible le plus haut (handover au croisement).
      * @param {string} orbitId 'LEO' | 'MEO'
      * @param {number} tSec    temps de simulation (s)
-     * @param {object} opts    { satsPerPlane, maxElevationDeg, minElevationDeg }
+     * @param {object} opts    { satsPerPlane, maxElevationDeg, minElevationDeg, altitudeKm }
      */
     constellationState(orbitId, tSec, opts = {}) {
       const orbit = SatPhysics.getOrbit(orbitId);
-      const h = orbit.altitudeKm;
+      const h = opts.altitudeKm || orbit.altitudeKm; // altitude propre (constellations Direct-to-Device)
       const T = SatPhysics.orbitalPeriodMin(h) * 60;
       const w = (2 * Math.PI) / T;
       const N = Util.clamp(Math.round(opts.satsPerPlane || 24), 1, 200);
@@ -848,12 +848,14 @@
 
       /* --- Référence ciel clair / pointage parfait ---
        * L'état « dégradé » (orange) signale un repli de MODCOD dû à la pluie ou
-       * au dépointage, par rapport à ce que la liaison obtient par ciel clair. */
+       * au dépointage, par rapport à ce que la liaison obtient par ciel clair.
+       * La référence exclut aussi la perte cachée (panne, écart de recette) :
+       * sinon un repli de MODCOD causé par une panne resterait affiché en vert. */
       if (!p._reference) {
         const ref = SatPhysics.computeSatLink(
           Object.assign({}, p, {
             _reference: true,
-            remote: Object.assign({}, remote, { rainMmH: 0, azErrDeg: 0, elErrDeg: 0, skewErrDeg: 0 }),
+            remote: Object.assign({}, remote, { rainMmH: 0, azErrDeg: 0, elErrDeg: 0, skewErrDeg: 0, hiddenLossUpDb: 0, hiddenLossDownDb: 0 }),
             hub: Object.assign({}, hub, { rainMmH: 0 }),
           })
         );
